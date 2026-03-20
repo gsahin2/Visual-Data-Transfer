@@ -4,7 +4,7 @@
 
 - **C bridge** — wraps `vdt_*` functions from `VDTCoreC` (built from `core/` sources).
 - **Sender** — `SenderScreen` builds a loop cycle via `VDTFramedSession`, drives **`TransferLoopPlayer`** (FPS / play/step / **completed loop count** / optional **auto-stop** after N loops; **CADisplayLink** on iOS, `Timer` on macOS for SwiftPM), and **`SenderTransmissionView`** shows each wire frame (payload grid vs descriptor panel) with **`MatrixRainGutterOverlay`** (Matrix glyphs only in gutters, decode-safe) and **corner markers** (`CornerMarkersView`).
-- **Receiver** — `ReceiverScreen` + `CaptureSessionController`; throttled **`LumaGridDecoder`** (12×20, same thresholds as `python/grid_codec.py`) updates status with hex / ASCII preview; optional **RX:** auxiliary line (listening / ingesting / reject / complete + sticky last payload); if bytes form a **full** VT wire frame, **`VDTWireFrameParser`** + **`VDTSessionReassembler`** can merge chunks when the session completes (full-bleed, no homography yet; default sender grid carries **frame payload** only, not whole wire).
+- **Receiver** — `ReceiverScreen` + `CaptureSessionController`; throttled decode (12×20): default **`LumaGridDecoder`** with Swift margin/gap (matches sender UI), or optional **`VDTFullBleedGridSampler`** (`vdt_sample_grid_full_bleed`: C++ homography + bilinear sample); toggles for **temporal vote** (`TemporalSymbolMajority`, 3 frames) and **adaptive cell thresholds**; **`ReceiverPhase`** status line + **RX:** auxiliary (listening / ingesting / reject / complete + sticky last payload); full VT magic → **`VDTWireFrameParser`** + **`VDTSessionReassembler`** (default sender grid is **payload-only**, not whole wire per frame).
 
 ## Integrating into an Xcode app
 

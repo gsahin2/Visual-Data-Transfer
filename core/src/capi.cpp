@@ -10,6 +10,9 @@
 #include "vdt/protocol/constants.hpp"
 #include "vdt/protocol/frame.hpp"
 #include "vdt/render/layout.hpp"
+#include "vdt/vision/grid_sampler.hpp"
+#include "vdt/vision/homography.hpp"
+#include "vdt/vision/marker_detector.hpp"
 
 #include <cstdlib>
 #include <cstring>
@@ -201,6 +204,46 @@ uint32_t vdt_symbol_cell_to_index(const uint16_t grid_rows, const uint16_t grid_
                                   const uint16_t col) {
   const vdt::encode::GridSpec g{grid_rows, grid_cols};
   return vdt::encode::cell_to_index(g, row, col);
+}
+
+int vdt_sample_grid_full_bleed(const uint8_t* gray, const uint32_t width, const uint32_t height, const uint16_t rows,
+                               const uint16_t cols, uint8_t* out_luma, const size_t out_capacity) {
+  if (gray == nullptr || out_luma == nullptr || width < 2 || height < 2 || rows == 0 || cols == 0) {
+    return 0;
+  }
+  const std::size_t npix = static_cast<std::size_t>(width) * static_cast<std::size_t>(height);
+  const std::size_t need_out = static_cast<std::size_t>(rows) * static_cast<std::size_t>(cols);
+  if (out_capacity < need_out) {
+    return 0;
+  }
+  const vdt::vision::GrayImageView img{width, height, std::span<const std::uint8_t>(gray, npix)};
+  std::array<vdt::vision::Point2f, 4> corners_px{};
+  vdt::vision::FullBleedMarkerDetector detector{};
+  if (!detector.detect(img, corners_px)) {
+    return 0;
+  }
+  const float inv_w = 1.0F / static_cast<float>(width - 1);
+  const float inv_h = 1.0F / static_cast<float>(height - 1);
+  const std::array<vdt::vision::Point2f, 4> src_norm{
+      vdt::vision::Point2f{0.0F, 0.0F}, {1.0F, 0.0F}, {1.0F, 1.0F}, {0.0F, 1.0F}};
+  std::array<vdt::vision::Point2f, 4> dst_norm{};
+  for (std::size_t i = 0; i < 4; ++i) {
+    dst_norm[i] = {corners_px[i].x * inv_w, corners_px[i].y * inv_h};
+  }
+  std::array<float, 9> h{};
+  vdt::vision::HomographyEstimator estimator{};
+  if (!estimator.estimate(std::span<const vdt::vision::Point2f, 4>(src_norm),
+                          std::span<const vdt::vision::Point2f, 4>(dst_norm), h)) {
+    return 0;
+  }
+  vdt::vision::GridSampler sampler{};
+  sampler.set_homography(h);
+  std::vector<std::uint8_t> tmp;
+  if (!sampler.sample_grid(img, rows, cols, tmp) || tmp.size() != need_out) {
+    return 0;
+  }
+  std::memcpy(out_luma, tmp.data(), tmp.size());
+  return 1;
 }
 
 VDTSessionAssembler* vdt_session_assembler_create(void) {

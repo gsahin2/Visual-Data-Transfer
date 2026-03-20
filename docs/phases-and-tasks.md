@@ -49,7 +49,7 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 | Bit packing (MSB-first) | [x] — `bit_packing.*` |
 | 2-bit / 4-level symbol helpers (V1 visual) | [x] — `symbol_mapping.hpp`, Swift/Python |
 | C API: CRC, frame build/parse, loop cycle, layout, **session assembler** | [x] — `capi.*`, `vdt_session_assembler_*`; Python `SessionAssembler.push_decoded` matches `push_decoded` |
-| Unit tests (CRC16/32, frames, loop, symbols, roundtrip) | [x] — `core/tests/` |
+| Unit tests (CRC16/32, frames, loop, symbols, roundtrip) | [x] — `core/tests/` (Catch2); Python `unittest` `python/test_vdt_protocol_v1.py` |
 | `protocol-v1.md` | [x] |
 
 ---
@@ -94,7 +94,7 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 | Debug overlays, missing-frame stats, logging | [~] — `--decode-grid` prints **read vs decoded** counts, stride skips, stop reason (`eof` / `max_frames`); with `--try-parse-wire`: magic prefix / short / parse_ok / parse_fail; **`--quiet`** skips per-frame lines; **`--wire-dir`** summary: push_ok / push_fail |
 | End-to-end: **video file → full payload** (optical) | [ ] |
 
-**Note:** C++ has `GridSampler`, `homography`, `FullBleedMarkerDetector` for future wiring; not yet driven from Python video path.
+**Note:** C++ vision is wired on **iOS** via `vdt_sample_grid_full_bleed` (`VDTFullBleedGridSampler`). The **Python** video path still uses Swift/Python margin/gap sampling only (no homography in `decode_recorded_video.py` yet).
 
 ---
 
@@ -109,10 +109,10 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 | Full-bleed **2-bit grid** decode from luma (Swift, Python-parity) | [x] — `LumaGridDecoder` + `ReceiverScreen` status |
 | If luma decodes to raw **VT** wire, show parse in status | [x] — magic `0x56 0x54` + `VDTWireFrameParser` |
 | **`VDTSessionReassembler`** (core assembler via C API) | [x] — when a **full** wire frame parses; normal sender grid is **payload-only** (~60 B/cell budget), so E2E optical assembly needs larger grid or full-wire mode later |
-| Wire C++ `GridSampler` / homography in app | [ ] |
-| Session state machine (detect transfer, progress, complete) | [~] — `ReceiverScreen` **RX:** line: listening → ingesting chunk / reject → complete; sticky last payload until new descriptor or stop |
-| Progress UI, errors / retry hints | [~] — luma line + auxiliary status (assembly hints) |
-| Duplicate / confidence / adaptive thresholding | [ ] |
+| Wire C++ `GridSampler` / homography in app | [x] — `vdt_sample_grid_full_bleed` (`FullBleedMarkerDetector` → normalized quad → `GridSampler`); Swift `VDTFullBleedGridSampler`; Receiver toggle **C++ full-bleed grid** |
+| Session state machine (detect transfer, progress, complete) | [x] — `ReceiverPhase` + `phaseLabel`: idle → listening → decoded raw → wire → assembling → complete / rejected |
+| Progress UI, errors / retry hints | [x] — phase caption + luma line + **RX:** auxiliary (sticky last payload); reject line suggests retry / alignment |
+| Duplicate / confidence / adaptive thresholding | [x] — `TemporalSymbolMajority` (3-frame per-cell vote); optional **adaptive** min–max quartile thresholds in `LumaGridDecoder`; chunk/session consistency still enforced in core assembler |
 
 ---
 
@@ -148,7 +148,7 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 | Tests | `core/tests/`, CMake + Catch2 |
 | Swift kit + demo | `ios/Sources/`, `ios/Demo/`, root `Package.swift` |
 | Swift luma grid decode | `ios/Sources/VisualDataTransferKit/Vision/LumaGridDecoder.swift` |
-| Python tools | `python/` |
+| Python tools | `python/` (`unittest`: `test_vdt_protocol_v1.py`) |
 | Specs & constraints | `docs/` |
 
 ---

@@ -59,6 +59,11 @@ void vdt_layout_cell_rect(uint32_t viewport_width, uint32_t viewport_height, uin
 /// Row-major linear index from cell coordinates.
 uint32_t vdt_symbol_cell_to_index(uint16_t grid_rows, uint16_t grid_cols, uint16_t row, uint16_t col);
 
+/// Full-bleed marker corners + homography (`FullBleedMarkerDetector` → normalized quad → `GridSampler`) and bilinear
+/// luma sample into `out_luma` (row-major, `rows * cols` bytes). Returns 1 on success.
+int vdt_sample_grid_full_bleed(const uint8_t* gray, uint32_t width, uint32_t height, uint16_t rows, uint16_t cols,
+                               uint8_t* out_luma, size_t out_capacity);
+
 /// Opaque session reassembly state (V1 `SessionAssembler`).
 typedef struct VDTSessionAssembler VDTSessionAssembler;
 

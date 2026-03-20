@@ -5,6 +5,8 @@
 #include "vdt/decode/frame_decoder.hpp"
 #include "vdt/decode/session_assembler.hpp"
 #include "vdt/encode/frame_encoder.hpp"
+#include "vdt/vision/grid_sampler.hpp"
+#include "vdt/vision/interfaces.hpp"
 
 #include <cstring>
 #include <vector>
@@ -62,4 +64,25 @@ TEST_CASE("capi session assembler push_wire transfer loop", "[capi][assembler]")
 
   vdt_session_assembler_destroy(a);
   vdt_encoded_session_free(sess);
+}
+
+TEST_CASE("capi full-bleed grid sample identity", "[capi][vision]") {
+  constexpr int w = 32;
+  constexpr int h = 24;
+  std::vector<uint8_t> gray(static_cast<std::size_t>(w * h));
+  for (int y = 0; y < h; ++y) {
+    for (int x = 0; x < w; ++x) {
+      gray[static_cast<std::size_t>(y * w + x)] = static_cast<std::uint8_t>((x + y) & 0xFF);
+    }
+  }
+  constexpr uint16_t rows = 2;
+  constexpr uint16_t cols = 2;
+  std::vector<uint8_t> out(static_cast<std::size_t>(rows) * cols);
+  REQUIRE(vdt_sample_grid_full_bleed(gray.data(), static_cast<uint32_t>(w), static_cast<uint32_t>(h), rows, cols,
+                                     out.data(), out.size()) == 1);
+  vdt::vision::GrayImageView view{static_cast<uint32_t>(w), static_cast<uint32_t>(h), std::span(gray)};
+  vdt::vision::GridSampler sampler{};
+  std::vector<std::uint8_t> ref;
+  REQUIRE(sampler.sample_grid(view, rows, cols, ref));
+  REQUIRE(ref == out);
 }

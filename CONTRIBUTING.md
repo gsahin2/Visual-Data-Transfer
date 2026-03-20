@@ -40,7 +40,10 @@ swift build
 ```bash
 cd python && pip install -r requirements.txt
 python3 generate_test_frames.py --out-dir ../samples/generated
+python3 -m unittest discover -v -p 'test_*.py'
 ```
+
+Protocol / assembler smoke tests live in `python/test_vdt_protocol_v1.py` (stdlib `unittest` only; no pytest required).
 
 ## Pull requests
 
