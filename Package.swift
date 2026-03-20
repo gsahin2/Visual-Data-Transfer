@@ -17,6 +17,7 @@ let package = Package(
             path: "core",
             exclude: [
                 "tests",
+                "build",
                 "CMakeLists.txt",
             ],
             publicHeadersPath: "ffi/include",

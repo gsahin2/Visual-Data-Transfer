@@ -74,6 +74,17 @@ bool SessionAssembler::is_complete() const {
   return buffer_.is_complete();
 }
 
+std::optional<std::size_t> SessionAssembler::complete_payload_size() const {
+  if (!buffer_.is_complete()) {
+    return std::nullopt;
+  }
+  const auto merged = buffer_.merged_payload();
+  if (!merged) {
+    return std::nullopt;
+  }
+  return merged->size();
+}
+
 std::optional<ByteBuffer> SessionAssembler::take_merged_payload() {
   if (!buffer_.is_complete()) {
     return std::nullopt;

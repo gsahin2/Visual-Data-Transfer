@@ -48,7 +48,7 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 | `SessionAssembler` + duplicate identical-chunk tolerance | [x] |
 | Bit packing (MSB-first) | [x] — `bit_packing.*` |
 | 2-bit / 4-level symbol helpers (V1 visual) | [x] — `symbol_mapping.hpp`, Swift/Python |
-| C API: CRC, frame build/parse, loop cycle, layout | [x] — `capi.*` |
+| C API: CRC, frame build/parse, loop cycle, layout, **session assembler** | [x] — `capi.*`, `vdt_session_assembler_*` |
 | Unit tests (CRC16/32, frames, loop, symbols, roundtrip) | [x] — `core/tests/` |
 | `protocol-v1.md` | [x] |
 
@@ -107,6 +107,7 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 | Luma buffer callback to delegate | [x] |
 | Full-bleed **2-bit grid** decode from luma (Swift, Python-parity) | [x] — `LumaGridDecoder` + `ReceiverScreen` status |
 | If luma decodes to raw **VT** wire, show parse in status | [x] — magic `0x56 0x54` + `VDTWireFrameParser` |
+| **`VDTSessionReassembler`** (core assembler via C API) | [x] — when a **full** wire frame parses; normal sender grid is **payload-only** (~60 B/cell budget), so E2E optical assembly needs larger grid or full-wire mode later |
 | Wire C++ `GridSampler` / homography in app | [ ] |
 | Session state machine (detect transfer, progress, complete) | [ ] |
 | Progress UI, errors / retry hints | [~] — basic status text |

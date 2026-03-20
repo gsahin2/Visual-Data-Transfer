@@ -17,6 +17,8 @@ class SessionAssembler {
   void reset();
   [[nodiscard]] bool push_frame(const DecodedFrame& frame);
   [[nodiscard]] bool is_complete() const;
+  /// Byte length of merged payload when `is_complete()`, before CRC verification (for sizing output buffers).
+  [[nodiscard]] std::optional<std::size_t> complete_payload_size() const;
   /// When a descriptor was seen, verifies assembled size and CRC32 before returning.
   [[nodiscard]] std::optional<ByteBuffer> take_merged_payload();
 

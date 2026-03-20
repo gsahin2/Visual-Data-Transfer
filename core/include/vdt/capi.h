@@ -59,6 +59,26 @@ void vdt_layout_cell_rect(uint32_t viewport_width, uint32_t viewport_height, uin
 /// Row-major linear index from cell coordinates.
 uint32_t vdt_symbol_cell_to_index(uint16_t grid_rows, uint16_t grid_cols, uint16_t row, uint16_t col);
 
+/// Opaque session reassembly state (V1 `SessionAssembler`).
+typedef struct VDTSessionAssembler VDTSessionAssembler;
+
+VDTSessionAssembler* vdt_session_assembler_create(void);
+void vdt_session_assembler_destroy(VDTSessionAssembler* assembler);
+void vdt_session_assembler_reset(VDTSessionAssembler* assembler);
+
+/// Push one full wire frame (header + payload + CRC16). Returns 1 on success.
+int vdt_session_assembler_push_wire(VDTSessionAssembler* assembler, const uint8_t* wire, size_t wire_length);
+
+/// Push a decoded logical frame (same as after `vdt_frame_parse`). `header->payload_length` must match `payload_length`.
+int vdt_session_assembler_push_decoded(VDTSessionAssembler* assembler, const VDTFrameHeaderC* header,
+                                       const uint8_t* payload, size_t payload_length);
+
+int vdt_session_assembler_is_complete(const VDTSessionAssembler* assembler);
+
+/// Copies merged transfer bytes after CRC32 verify (when descriptor was seen). Returns 0 if not ready, CRC failed, or
+/// `out_capacity` too small (assembler unchanged). On success returns byte count and resets the assembler.
+size_t vdt_session_assembler_take_merged_payload(VDTSessionAssembler* assembler, uint8_t* out, size_t out_capacity);
+
 #ifdef __cplusplus
 }
 #endif

@@ -2,6 +2,8 @@
 
 #include "vdt/common/crc16.hpp"
 #include "vdt/common/crc32.hpp"
+#include "vdt/decode/frame_decoder.hpp"
+#include "vdt/decode/session_assembler.hpp"
 #include "vdt/encode/frame_encoder.hpp"
 #include "vdt/encode/transfer_loop.hpp"
 #include "vdt/encode/symbol_mapping.hpp"
@@ -13,6 +15,10 @@
 #include <cstring>
 #include <span>
 #include <vector>
+
+struct VDTSessionAssembler {
+  vdt::decode::SessionAssembler inner;
+};
 
 extern "C" {
 
@@ -195,6 +201,81 @@ uint32_t vdt_symbol_cell_to_index(const uint16_t grid_rows, const uint16_t grid_
                                   const uint16_t col) {
   const vdt::encode::GridSpec g{grid_rows, grid_cols};
   return vdt::encode::cell_to_index(g, row, col);
+}
+
+VDTSessionAssembler* vdt_session_assembler_create(void) {
+  return new VDTSessionAssembler{};
+}
+
+void vdt_session_assembler_destroy(VDTSessionAssembler* assembler) {
+  delete assembler;
+}
+
+void vdt_session_assembler_reset(VDTSessionAssembler* assembler) {
+  if (assembler == nullptr) {
+    return;
+  }
+  assembler->inner.reset();
+}
+
+int vdt_session_assembler_push_wire(VDTSessionAssembler* assembler, const uint8_t* wire, const size_t wire_length) {
+  if (assembler == nullptr || wire == nullptr) {
+    return 0;
+  }
+  const auto decoded = vdt::decode::decode_frame({wire, wire_length});
+  if (!decoded) {
+    return 0;
+  }
+  return assembler->inner.push_frame(*decoded) ? 1 : 0;
+}
+
+int vdt_session_assembler_push_decoded(VDTSessionAssembler* assembler, const VDTFrameHeaderC* header,
+                                         const uint8_t* payload, const size_t payload_length) {
+  if (assembler == nullptr || header == nullptr) {
+    return 0;
+  }
+  if (payload_length > UINT16_MAX || header->payload_length != payload_length) {
+    return 0;
+  }
+  if (payload_length > 0 && payload == nullptr) {
+    return 0;
+  }
+  vdt::protocol::FrameHeader h{};
+  h.version = header->version;
+  h.frame_type = static_cast<vdt::protocol::FrameType>(header->frame_type);
+  h.flags = header->flags;
+  h.reserved = 0;
+  h.session_id = header->session_id;
+  h.chunk_index = header->chunk_index;
+  h.chunk_count = header->chunk_count;
+  h.payload_length = header->payload_length;
+  vdt::ByteBuffer pay;
+  pay.assign(payload, payload + payload_length);
+  const vdt::decode::DecodedFrame df{h, std::move(pay)};
+  return assembler->inner.push_frame(df) ? 1 : 0;
+}
+
+int vdt_session_assembler_is_complete(const VDTSessionAssembler* assembler) {
+  if (assembler == nullptr) {
+    return 0;
+  }
+  return assembler->inner.is_complete() ? 1 : 0;
+}
+
+size_t vdt_session_assembler_take_merged_payload(VDTSessionAssembler* assembler, uint8_t* out, const size_t out_capacity) {
+  if (assembler == nullptr || out == nullptr || out_capacity == 0) {
+    return 0;
+  }
+  const auto sz = assembler->inner.complete_payload_size();
+  if (!sz || *sz > out_capacity) {
+    return 0;
+  }
+  const auto merged = assembler->inner.take_merged_payload();
+  if (!merged) {
+    return 0;
+  }
+  std::memcpy(out, merged->data(), merged->size());
+  return merged->size();
 }
 
 }

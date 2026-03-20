@@ -1,10 +1,12 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include "vdt/capi.h"
 #include "vdt/common/bit_packing.hpp"
 #include "vdt/decode/frame_decoder.hpp"
 #include "vdt/decode/session_assembler.hpp"
 #include "vdt/encode/frame_encoder.hpp"
 
+#include <cstring>
 #include <vector>
 
 TEST_CASE("encode/decode session roundtrip", "[encode][decode]") {
@@ -38,4 +40,26 @@ TEST_CASE("bit packing roundtrip", "[bitpack]") {
   REQUIRE(r.read_bits(2, b));
   REQUIRE(a == 0b101);
   REQUIRE(b == 0b11);
+}
+
+TEST_CASE("capi session assembler push_wire transfer loop", "[capi][assembler]") {
+  const char msg[] = "Hello, VDT";
+  VDTEncodedSession* sess =
+      vdt_transfer_loop_cycle(42, reinterpret_cast<const uint8_t*>(msg), std::strlen(msg), 1, 1024);
+  REQUIRE(sess != nullptr);
+  REQUIRE(sess->frame_count > 0);
+
+  VDTSessionAssembler* a = vdt_session_assembler_create();
+  REQUIRE(a != nullptr);
+  for (size_t i = 0; i < sess->frame_count; ++i) {
+    REQUIRE(vdt_session_assembler_push_wire(a, sess->frame_data[i], sess->frame_sizes[i]) == 1);
+  }
+  REQUIRE(vdt_session_assembler_is_complete(a) == 1);
+  std::vector<uint8_t> out(vdt_max_transfer_payload_bytes());
+  const size_t n = vdt_session_assembler_take_merged_payload(a, out.data(), out.size());
+  REQUIRE(n == std::strlen(msg));
+  REQUIRE(std::memcmp(out.data(), msg, n) == 0);
+
+  vdt_session_assembler_destroy(a);
+  vdt_encoded_session_free(sess);
 }

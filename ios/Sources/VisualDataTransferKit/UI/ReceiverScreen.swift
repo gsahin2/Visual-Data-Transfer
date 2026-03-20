@@ -47,6 +47,7 @@ private final class ReceiverModel: ObservableObject, CaptureSessionControllerDel
     let controller = CaptureSessionController()
     private let frameTick = FrameTickCounter()
     private let gridDecoder = LumaGridDecoder()
+    private let reassembler = VDTSessionReassembler()
 
     /// Matches sender default visual grid (`SenderScreen`).
     private let gridRows = 12
@@ -61,6 +62,7 @@ private final class ReceiverModel: ObservableObject, CaptureSessionControllerDel
         if running {
             controller.stop()
             running = false
+            reassembler.reset()
             status = "Camera idle"
         } else {
             do {
@@ -103,6 +105,15 @@ private final class ReceiverModel: ObservableObject, CaptureSessionControllerDel
                 if decoded.count >= 20, decoded[0] == 0x56, decoded[1] == 0x54, let w = VDTWireFrameParser.parse(decoded) {
                     let kind = w.isDescriptor ? "DESC" : (w.isPayload ? "DATA" : "?")
                     line += " · wire:\(kind) id=\(w.sessionId) \(w.chunkIndex)/\(w.chunkCount)"
+                    let ar = self.reassembler.pushDecodedReportCompletion(w)
+                    if !ar.pushed {
+                        line += " · asm:reject"
+                    } else if let merged = ar.merged {
+                        let text = String(decoding: merged, as: UTF8.self)
+                        let safe = text.allSatisfy { $0.isASCII && !$0.unicodeScalars.contains { $0.properties.generalCategory == .control } }
+                        let tail = safe ? " “\(text.prefix(80))”" : ""
+                        line += " · asm:done \(merged.count) B\(tail)"
+                    }
                 }
             } else {
                 line += " · grid decode —"

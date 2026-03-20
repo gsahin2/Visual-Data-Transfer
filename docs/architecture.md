@@ -33,7 +33,7 @@ Visual Data Transfer separates **protocol and vision mathematics** from **platfo
 
 ## Bridging
 
-The stable C API in `core/include/vdt/capi.h` is mirrored under `core/ffi/include` for Swift Package Manager. Swift code should call these entry points instead of reimplementing protocol rules.
+The stable C API in `core/include/vdt/capi.h` is mirrored under `core/ffi/include` for Swift Package Manager. Swift code should call these entry points instead of reimplementing protocol rules. Session reassembly is exposed as `vdt_session_assembler_*` (opaque handle, `push_wire` / `push_decoded`, `take_merged_payload`); the kit wraps this in `VDTSessionReassembler`.
 
 ## Build surfaces
 
