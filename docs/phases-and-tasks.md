@@ -68,7 +68,7 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 | Corner L-markers (pulse does not change cell pixels) | [x] — `CornerMarkersView` |
 | Matrix-style **side** strips (grid not covered) | [x] — `MatrixRainStrip` |
 | Idle + transmit preview share same inner grid width | [x] — `SenderScreen` |
-| **CADisplayLink**-locked timing vs wall clock | [~] — `Timer` today |
+| **CADisplayLink**-locked timing vs wall clock | [x] — iOS: `CADisplayLink` in `TransferLoopPlayer`; macOS/SPM: `Timer` |
 | Matrix animation **over** data cells (decode-proven safe) | [ ] |
 | Automated “loop until user stops” **product** scheduler (beyond one cycle buffer) | [~] — cycles repeat; no separate session timer |
 
@@ -87,7 +87,9 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 | From **video frames**: full-bleed grid sample + 2-bit → bytes | [x] — `--decode-grid` + `grid_codec.py` (no homography) |
 | From **video frames**: markers, homography, crop | [ ] |
 | From **video frames**: classify → **wire** `parse_frame` / chunk assembly | [ ] |
-| Timestamp / frame-skip policy for video | [ ] |
+| Timestamp / frame-skip policy for video | [~] — `--frame-stride` |
+| Dump grid-decoded blobs to disk | [x] — `--write-decoded DIR` |
+| Optional `parse_frame` on grid output (debug) | [x] — `--try-parse-wire` |
 | Debug overlays, missing-frame stats, logging | [ ] |
 | End-to-end: **video file → full payload** (optical) | [ ] |
 
@@ -104,6 +106,7 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 | AVFoundation capture + preview | [x] — `CaptureSessionController`, `ReceiverScreen` |
 | Luma buffer callback to delegate | [x] |
 | Full-bleed **2-bit grid** decode from luma (Swift, Python-parity) | [x] — `LumaGridDecoder` + `ReceiverScreen` status |
+| If luma decodes to raw **VT** wire, show parse in status | [x] — magic `0x56 0x54` + `VDTWireFrameParser` |
 | Wire C++ `GridSampler` / homography in app | [ ] |
 | Session state machine (detect transfer, progress, complete) | [ ] |
 | Progress UI, errors / retry hints | [~] — basic status text |

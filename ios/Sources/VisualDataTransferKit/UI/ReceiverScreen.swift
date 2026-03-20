@@ -100,6 +100,10 @@ private final class ReceiverModel: ObservableObject, CaptureSessionControllerDel
                 let ascii = head.allSatisfy { (32...126).contains($0) || $0 == 9 || $0 == 10 || $0 == 13 }
                 let preview = ascii ? " · “\(String(decoding: head, as: UTF8.self))”" : ""
                 line += " · decoded \(decoded.count) B [\(hex)]\(preview)"
+                if decoded.count >= 20, decoded[0] == 0x56, decoded[1] == 0x54, let w = VDTWireFrameParser.parse(decoded) {
+                    let kind = w.isDescriptor ? "DESC" : (w.isPayload ? "DATA" : "?")
+                    line += " · wire:\(kind) id=\(w.sessionId) \(w.chunkIndex)/\(w.chunkCount)"
+                }
             } else {
                 line += " · grid decode —"
             }

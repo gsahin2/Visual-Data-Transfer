@@ -21,7 +21,7 @@ else:
     _cv_import_error = None
 
 from grid_codec import decode_grid_from_ndarray_bgr
-from vdt_protocol_v1 import SessionAssembler, parse_frame
+from vdt_protocol_v1 import FRAME_DESCRIPTOR, FRAME_PAYLOAD, SessionAssembler, parse_frame
 
 
 def scan_frame_buffer(gray: np.ndarray) -> Optional[bytes]:
@@ -71,6 +71,17 @@ def scan_video(path: Path, max_frames: int) -> None:
     print(f"Scanned {max_frames} frames, structured hits: {found}")
 
 
+def _wire_line(parsed) -> str:
+    hdr, payload = parsed
+    if hdr.frame_type == FRAME_DESCRIPTOR:
+        name = "descriptor"
+    elif hdr.frame_type == FRAME_PAYLOAD:
+        name = "payload"
+    else:
+        name = str(hdr.frame_type)
+    return f"wire OK type={name} sid={hdr.session_id} chunk={hdr.chunk_index}/{hdr.chunk_count} plen={len(payload)}"
+
+
 def decode_video_grid(
     path: Path,
     max_frames: int,
@@ -81,6 +92,8 @@ def decode_video_grid(
     gap: int,
     byte_length: Optional[int],
     resize_wh: Optional[Tuple[int, int]],
+    write_decoded: Optional[Path],
+    try_parse_wire: bool,
 ) -> None:
     if cv2 is None:
         raise SystemExit(f"OpenCV is required: {_cv_import_error}")
@@ -103,7 +116,16 @@ def decode_video_grid(
         blob = decode_grid_from_ndarray_bgr(frame, rows, cols, margin, gap, byte_length)
         decoded.append(blob)
         preview = blob[:24]
-        print(f"frame {i}: decoded {len(blob)} B  head={preview!r}")
+        extra = ""
+        if try_parse_wire and len(blob) >= 20:
+            hit = parse_frame(blob)
+            if hit:
+                extra = f"  {_wire_line(hit)}"
+        print(f"frame {i}: decoded {len(blob)} B  head={preview!r}{extra}")
+        if write_decoded is not None:
+            write_decoded.mkdir(parents=True, exist_ok=True)
+            outp = write_decoded / f"frame_{i:06d}.bin"
+            outp.write_bytes(blob)
         processed += 1
         i += 1
     cap.release()
@@ -140,6 +162,17 @@ def main() -> None:
         default=None,
         help="WxH resize before decode e.g. 640x480 (match generator resolution)",
     )
+    parser.add_argument(
+        "--write-decoded",
+        type=Path,
+        default=None,
+        help="With --decode-grid: write each grid-decoded blob to this directory",
+    )
+    parser.add_argument(
+        "--try-parse-wire",
+        action="store_true",
+        help="After grid decode, try v1 parse_frame(blob) (e.g. if screen showed raw wire)",
+    )
     args = parser.parse_args()
 
     resize_wh: Optional[Tuple[int, int]] = None
@@ -165,6 +198,8 @@ def main() -> None:
             args.gap,
             args.byte_length,
             resize_wh,
+            args.write_decoded,
+            args.try_parse_wire,
         )
     elif args.video is not None:
         scan_video(args.video, args.max_frames)
