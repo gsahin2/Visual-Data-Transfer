@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Recorded video: optional **grid decode** on each frame, wire-dir reassembly, or legacy scaffold scan.
+With `--assemble-grid`, each successful `parse_frame` is passed to `SessionAssembler.push_decoded` (avoids re-parsing the same blob in `push_wire`).
 """
 
 from __future__ import annotations
@@ -167,7 +168,8 @@ def decode_video_grid(
                 else:
                     parse_fail += 1
         if asm is not None and parsed_blob is not None:
-            if asm.push_wire(blob):
+            hdr, pl = parsed_blob
+            if asm.push_decoded(hdr, pl):
                 asm_push_ok += 1
             else:
                 asm_push_fail += 1
