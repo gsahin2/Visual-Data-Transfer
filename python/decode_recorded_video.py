@@ -102,6 +102,7 @@ def decode_video_grid(
     resize_wh: Optional[Tuple[int, int]],
     write_decoded: Optional[Path],
     try_parse_wire: bool,
+    assemble_grid: bool,
     quiet: bool,
 ) -> None:
     if cv2 is None:
@@ -117,6 +118,12 @@ def decode_video_grid(
     parse_ok = 0
     parse_fail = 0
     magic_prefix = 0
+    asm = SessionAssembler() if assemble_grid else None
+    asm_push_ok = 0
+    asm_push_fail = 0
+    asm_sessions_ok = 0
+    asm_sessions_crc_fail = 0
+    last_assembled_preview: Optional[bytes] = None
     while processed < max_frames:
         ok, frame = cap.read()
         if not ok:
@@ -132,18 +139,39 @@ def decode_video_grid(
         decoded.append(blob)
         preview = blob[:24]
         extra = ""
+        parsed_blob = None
+        if (try_parse_wire or assemble_grid) and len(blob) >= 20:
+            parsed_blob = parse_frame(blob)
         if try_parse_wire:
             if len(blob) < 20:
                 parse_short += 1
             else:
                 if len(blob) >= 2 and blob[0] == 0x56 and blob[1] == 0x54:
                     magic_prefix += 1
-                hit = parse_frame(blob)
-                if hit:
+                if parsed_blob:
                     parse_ok += 1
-                    extra = f"  {_wire_line(hit)}"
+                    extra = f"  {_wire_line(parsed_blob)}"
                 else:
                     parse_fail += 1
+        if asm is not None and parsed_blob is not None:
+            if asm.push_wire(blob):
+                asm_push_ok += 1
+            else:
+                asm_push_fail += 1
+            if asm.is_complete():
+                merged = asm.take_payload()
+                if merged is not None:
+                    asm_sessions_ok += 1
+                    last_assembled_preview = merged[:120]
+                    if not quiet:
+                        print(
+                            f"frame {i}: ASSEMBLED {len(merged)} B  "
+                            f"{merged[:80]!r}{'...' if len(merged) > 80 else ''}"
+                        )
+                else:
+                    asm_sessions_crc_fail += 1
+                    if not quiet:
+                        print(f"frame {i}: assembler complete but CRC/size rejected")
         if not quiet:
             print(f"frame {i}: decoded {len(blob)} B  head={preview!r}{extra}")
         if write_decoded is not None:
@@ -165,6 +193,32 @@ def decode_video_grid(
             f"wire parse: magic_0x5654_prefix={magic_prefix}  "
             f"too_short_lt20={parse_short}  parse_ok={parse_ok}  parse_fail={parse_fail}"
         )
+    if assemble_grid and asm is not None:
+        eof_drained_ok = False
+        if asm.is_complete():
+            pl = asm.take_payload()
+            if pl is not None:
+                asm_sessions_ok += 1
+                last_assembled_preview = pl[:120]
+                eof_drained_ok = True
+                print(
+                    f"assembly: session finished at EOF → {len(pl)} B  "
+                    f"{pl[:100]!r}{'...' if len(pl) > 100 else ''}"
+                )
+            else:
+                asm_sessions_crc_fail += 1
+                print("assembly: EOF state was complete but take_payload rejected (CRC/size)")
+        preview_note = (
+            f"  last_ok_preview={last_assembled_preview!r}" if last_assembled_preview is not None else ""
+        )
+        print(
+            f"assembly: push_ok={asm_push_ok}  push_fail={asm_push_fail}  "
+            f"sessions_ok={asm_sessions_ok}  crc_or_size_reject={asm_sessions_crc_fail}{preview_note}"
+        )
+        if asm_push_ok == 0:
+            print("assembly: no valid wire frames were pushed (grid blobs are not full VT wire?)")
+        elif not asm.is_complete() and not eof_drained_ok:
+            print("assembly: incomplete at EOF (partial session; need more frames or full-wire grid)")
     if not decoded:
         print("No grid decodes accumulated.")
         return
@@ -209,6 +263,11 @@ def main() -> None:
         help="After grid decode, try v1 parse_frame(blob) (e.g. if screen showed raw wire)",
     )
     parser.add_argument(
+        "--assemble-grid",
+        action="store_true",
+        help="With --decode-grid: feed parseable wire frames into SessionAssembler (video → payload when grid carries full wire)",
+    )
+    parser.add_argument(
         "--quiet",
         action="store_true",
         help="With --decode-grid: no per-frame lines; still print summary stats",
@@ -240,6 +299,7 @@ def main() -> None:
             resize_wh,
             args.write_decoded,
             args.try_parse_wire,
+            args.assemble_grid,
             args.quiet,
         )
     elif args.video is not None:

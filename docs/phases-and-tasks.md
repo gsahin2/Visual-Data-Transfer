@@ -86,7 +86,7 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 | OpenCV: extract frames from video | [x] — `decode_recorded_video.py` |
 | From **video frames**: full-bleed grid sample + 2-bit → bytes | [x] — `--decode-grid` + `grid_codec.py` (no homography) |
 | From **video frames**: markers, homography, crop | [ ] |
-| From **video frames**: classify → **wire** `parse_frame` / chunk assembly | [ ] |
+| From **video frames**: classify → **wire** `parse_frame` / chunk assembly | [~] — `--assemble-grid` streams valid `parse_frame` hits into `SessionAssembler` (needs **full** VT wire in grid decode; typical sender payload grid is too short per frame) |
 | Timestamp / frame-skip policy for video | [~] — `--frame-stride` |
 | Dump grid-decoded blobs to disk | [x] — `--write-decoded DIR` |
 | Optional `parse_frame` on grid output (debug) | [x] — `--try-parse-wire` |
