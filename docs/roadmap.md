@@ -40,7 +40,7 @@ This roadmap tracks delivery of **reliable ~20 KB** transfers via **looping visu
 
 **Deliverables:** Swift sender demo with looping transmission (extends current `SenderScreen` / scheduler).
 
-**Progress (repo):** `TransferLoopPlayer` (FPS + play/step), `SenderTransmissionView` (parse wire via `vdt_frame_parse`, DATA vs DESCRIPTOR preview), **corner L-markers** with subtle pulse (data cells unchanged). Matrix column/glow still **todo** (must not alter 2-bit classification).
+**Progress (repo):** `TransferLoopPlayer` (FPS + play/step), `SenderTransmissionView` (parse wire via `vdt_frame_parse`, DATA vs DESCRIPTOR preview), **corner L-markers** with subtle pulse (data cells unchanged). **`MatrixRainStrip`** side columns (grid width reduced so symbols stay clear of decoration). Heavier Matrix effects over cells remain **out of scope** until classified as decode-safe.
 
 ## Phase 3 — Recorded decode (receiver V1)
 
@@ -52,7 +52,7 @@ This roadmap tracks delivery of **reliable ~20 KB** transfers via **looping visu
 
 **Deliverables:** Python or C++ recorded decoder achieving full payload reconstruction.
 
-**Progress (repo):** `python/vdt_protocol_v1.SessionAssembler` + `decode_recorded_video.py --wire-dir` to reassemble from raw `.bin` wire files (golden / simulator dumps). Video pixel path still **todo**.
+**Progress (repo):** `python/vdt_protocol_v1.SessionAssembler` + `decode_recorded_video.py --wire-dir` to reassemble from raw `.bin` wire files (golden / simulator dumps). **`grid_decode_image.py`** decodes synthetic grid PNGs (same layout as `generate_test_frames.py`) back to bytes for optical round-trip checks. Video pixel path still **todo**.
 
 ## Phase 4 — Live camera receiver
 

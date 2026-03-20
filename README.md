@@ -93,6 +93,7 @@ samples/     → test assets
 
 - **C++:** `cmake -S core -B build-core && cmake --build build-core && ctest --test-dir build-core`
 - **Swift:** `swift build` (root `Package.swift`)
+- **Python (examples):** `pip install -r python/requirements.txt` then `python3 python/generate_test_frames.py --out-dir samples/generated` and `python3 python/grid_decode_image.py samples/generated/grid_preview.png --compare "VDT test"` (lossless round-trip on synthetic PNGs). `python3 python/decode_recorded_video.py --wire-dir samples/generated` reassembles raw `.bin` wire files.
 - **Docs:** [Architecture](docs/architecture.md) · [Protocol V1](docs/protocol-v1.md) · [Frame layout](docs/frame-layout.md) · [Constraints](docs/constraints.md) · [Performance baseline](docs/performance-baseline.md) · [Roadmap](docs/roadmap.md) · [Contributing](CONTRIBUTING.md)
 
 **License:** [LICENSE](LICENSE) (Apache-2.0)

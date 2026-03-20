@@ -60,11 +60,12 @@ public struct SenderScreen: View {
             }
 
             GeometryReader { proxy in
-                let w = UInt32(max(1, Int(proxy.size.width.rounded())))
-                let h = UInt32(max(1, Int(proxy.size.height.rounded())))
+                let strip: CGFloat = 20
+                let innerW = max(32, proxy.size.width - 2 * strip)
+                let innerH = proxy.size.height
                 let spec = VDTLayoutSpec(
-                    viewportWidth: w,
-                    viewportHeight: h,
+                    viewportWidth: UInt32(max(1, Int(innerW.rounded()))),
+                    viewportHeight: UInt32(max(1, Int(innerH.rounded()))),
                     gridRows: grid.gridRows,
                     gridCols: grid.gridCols,
                     marginPx: grid.marginPx,
@@ -73,8 +74,15 @@ public struct SenderScreen: View {
                 if let encoded, !encoded.frames.isEmpty {
                     SenderTransmissionView(spec: spec, player: loopPlayer)
                 } else {
-                    SymbolGridView(message: Data(text.utf8), spec: spec)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    HStack(spacing: 0) {
+                        MatrixRainStrip()
+                            .frame(width: strip, height: innerH)
+                        SymbolGridView(message: Data(text.utf8), spec: spec)
+                            .frame(width: innerW, height: innerH)
+                        MatrixRainStrip()
+                            .frame(width: strip, height: innerH)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
             }
         }

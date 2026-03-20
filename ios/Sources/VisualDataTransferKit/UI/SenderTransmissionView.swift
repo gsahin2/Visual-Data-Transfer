@@ -1,19 +1,25 @@
 import SwiftUI
 
 /// Live transmission preview: current wire frame → parsed payload grid or descriptor state, with corner markers.
+/// Optional Matrix-style **side strips** keep the symbol grid width explicit so cell geometry stays decodable.
 public struct SenderTransmissionView: View {
     private let spec: VDTLayoutSpec
     @ObservedObject private var player: TransferLoopPlayer
+    private let matrixSideStripWidth: CGFloat
 
-    public init(spec: VDTLayoutSpec, player: TransferLoopPlayer) {
+    public init(spec: VDTLayoutSpec, player: TransferLoopPlayer, matrixSideStripWidth: CGFloat = 20) {
         self.spec = spec
         self.player = player
+        self.matrixSideStripWidth = matrixSideStripWidth
     }
 
     public var body: some View {
         GeometryReader { proxy in
-            let w = UInt32(max(1, Int(proxy.size.width.rounded())))
-            let h = UInt32(max(1, Int(proxy.size.height.rounded())))
+            let strip = matrixSideStripWidth
+            let innerW = max(32, proxy.size.width - 2 * strip)
+            let innerH = proxy.size.height
+            let w = UInt32(max(1, Int(innerW.rounded())))
+            let h = UInt32(max(1, Int(innerH.rounded())))
             let localSpec = VDTLayoutSpec(
                 viewportWidth: w,
                 viewportHeight: h,
@@ -22,14 +28,21 @@ public struct SenderTransmissionView: View {
                 marginPx: spec.marginPx,
                 gapPx: spec.gapPx
             )
-            ZStack {
-                transmissionBackground(parsed: player.parsedCurrent, spec: localSpec)
-                CornerMarkersView(spec: localSpec, pulse: player.isPlaying)
-                VStack {
-                    Spacer()
-                    statusBar(parsed: player.parsedCurrent, index: player.frameIndex, total: player.frames.count)
-                        .padding(8)
+            HStack(spacing: 0) {
+                MatrixRainStrip()
+                    .frame(width: strip, height: innerH)
+                ZStack {
+                    transmissionBackground(parsed: player.parsedCurrent, spec: localSpec)
+                    CornerMarkersView(spec: localSpec, pulse: player.isPlaying)
+                    VStack {
+                        Spacer()
+                        statusBar(parsed: player.parsedCurrent, index: player.frameIndex, total: player.frames.count)
+                            .padding(8)
+                    }
                 }
+                .frame(width: innerW, height: innerH)
+                MatrixRainStrip()
+                    .frame(width: strip, height: innerH)
             }
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
