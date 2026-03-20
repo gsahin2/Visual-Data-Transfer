@@ -3,8 +3,8 @@
 `VisualDataTransferKit` ships as a SwiftPM library product and includes:
 
 - **C bridge** — wraps `vdt_*` functions from `VDTCoreC` (built from `core/` sources).
-- **Sender** — `SenderScreen` builds a loop cycle via `VDTFramedSession`, drives **`TransferLoopPlayer`** (FPS / play/step / **completed loop count** / optional **auto-stop** after N loops; **CADisplayLink** on iOS, `Timer` on macOS for SwiftPM), and **`SenderTransmissionView`** shows each wire frame (payload grid vs descriptor panel) with **`MatrixRainGutterOverlay`** (Matrix glyphs only in gutters, decode-safe) and **corner markers** (`CornerMarkersView`).
-- **Receiver** — `ReceiverScreen` + `CaptureSessionController`; throttled decode (12×20): default **`LumaGridDecoder`** with Swift margin/gap (matches sender UI), or optional **`VDTFullBleedGridSampler`** (`vdt_sample_grid_full_bleed`: C++ homography + bilinear sample); toggles for **temporal vote** (`TemporalSymbolMajority`, 3 frames) and **adaptive cell thresholds**; **`ReceiverPhase`** status line + **RX:** auxiliary (listening / ingesting / reject / complete + sticky last payload); full VT magic → **`VDTWireFrameParser`** + **`VDTSessionReassembler`** (default sender grid is **payload-only**, not whole wire per frame).
+- **Sender** — `SenderScreen` builds a loop cycle via `VDTFramedSession` + **`VDTTransferLoopBuildOptions`** (Phase 5: **descriptor every K payloads** in Normal, **trailing descriptor**); drives **`TransferLoopPlayer`** (FPS / play/step / **completed loop count** / auto-stop presets including **Auto-stop by frame count**); **`SenderTransmissionView`** shows each wire frame with **`MatrixRainGutterOverlay`** and **`CornerMarkersView`**.
+- **Receiver** — `ReceiverScreen` + `CaptureSessionController`; throttled decode (12×20): **`LumaGridDecoder`** or **`VDTFullBleedGridSampler`**; **temporal vote** depth 1…7 (`TemporalSymbolMajority`); **adaptive** cell thresholds; **mean-luma** + motion-proxy hints (low-light / stability); **`ReceiverPhase`** + **RX:** auxiliary; **`VDTWireFrameParser`** + **`VDTSessionReassembler`** when grid yields full VT wire.
 
 ## Integrating into an Xcode app
 

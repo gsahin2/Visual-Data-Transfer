@@ -28,8 +28,12 @@ public struct ReceiverScreen: View {
             VStack(alignment: .leading, spacing: 8) {
                 Toggle("C++ full-bleed grid (homography)", isOn: $model.useCoreSampler)
                     .font(.footnote)
-                Toggle("Temporal vote (3 frames)", isOn: $model.useTemporalVote)
+                Toggle("Temporal vote", isOn: $model.useTemporalVote)
                     .font(.footnote)
+                if model.useTemporalVote {
+                    Stepper("Vote depth: \(model.temporalVoteDepth)", value: $model.temporalVoteDepth, in: 1...7)
+                        .font(.footnote)
+                }
                 Toggle("Adaptive cell thresholds", isOn: $model.useAdaptiveCellLevels)
                     .font(.footnote)
             }
@@ -83,6 +87,7 @@ private final class ReceiverModel: ObservableObject, CaptureSessionControllerDel
     @Published var running: Bool = false
     @Published var useCoreSampler = false
     @Published var useTemporalVote = true
+    @Published var temporalVoteDepth = 3
     @Published var useAdaptiveCellLevels = false
 
     let controller = CaptureSessionController()
@@ -95,6 +100,7 @@ private final class ReceiverModel: ObservableObject, CaptureSessionControllerDel
     private let gridCols = 20
     private let decodeEveryNthFrame = 12
     private var lastDeliveredLine: String?
+    private var lastMeanLuma: Float = -1
     private var symbolVoter = TemporalSymbolMajority(cellCount: 12 * 20, depth: 3)
 
     init() {
@@ -109,6 +115,7 @@ private final class ReceiverModel: ObservableObject, CaptureSessionControllerDel
             lastDeliveredLine = nil
             auxiliaryStatus = ""
             symbolVoter.reset()
+            lastMeanLuma = -1
             phaseLabel = ReceiverPhase.idle.rawValue
             status = "Camera idle"
         } else {
@@ -144,10 +151,40 @@ private final class ReceiverModel: ObservableObject, CaptureSessionControllerDel
         }
     }
 
+    private func ensureSymbolVoter() {
+        let n = gridRows * gridCols
+        let d = useTemporalVote ? max(1, min(7, temporalVoteDepth)) : 1
+        if symbolVoter.cellCount != n || symbolVoter.depth != d {
+            symbolVoter = TemporalSymbolMajority(cellCount: n, depth: d)
+        }
+    }
+
+    private static func meanLuma(buffer: Data, width: Int, height: Int) -> Float {
+        let n = width * height
+        guard buffer.count >= n, n > 0 else { return 128 }
+        var s = 0
+        buffer.withUnsafeBytes { raw in
+            let p = raw.bindMemory(to: UInt8.self)
+            for i in 0..<n { s += Int(p[i]) }
+        }
+        return Float(s) / Float(n)
+    }
+
     private func handleLumaFrame(buffer: Data, width: Int, height: Int) {
         guard running else { return }
 
-        let cellCount = gridRows * gridCols
+        ensureSymbolVoter()
+        let mean = Self.meanLuma(buffer: buffer, width: width, height: height)
+        let motion = lastMeanLuma >= 0 ? abs(mean - lastMeanLuma) : 0
+        lastMeanLuma = mean
+        var sceneHints: [String] = []
+        if mean < 52 {
+            sceneHints.append("Scene dark — add light or enable adaptive + longer vote.")
+        }
+        if motion > 14 {
+            sceneHints.append("Brightness shifting — hold steadier (motion tolerance).")
+        }
+
         let symbols: [UInt8]? = {
             if useCoreSampler {
                 guard let cells = VDTFullBleedGridSampler.sampleCells(
@@ -191,8 +228,11 @@ private final class ReceiverModel: ObservableObject, CaptureSessionControllerDel
 
         var line = "Luma \(width)×\(height) · grid \(gridRows)×\(gridCols)"
         line += useCoreSampler ? " · C++ sample" : " · Swift margin/gap"
-        line += useTemporalVote ? " · vote×3" : ""
+        if useTemporalVote {
+            line += " · vote×\(symbolVoter.depth)"
+        }
         line += useAdaptiveCellLevels ? " · adaptive" : ""
+        line += String(format: " · meanY=%.0f", mean)
 
         var phase: ReceiverPhase = .listening
         var stateLine = "RX: listening — awaiting decodable VT wire in grid"
@@ -237,6 +277,9 @@ private final class ReceiverModel: ObservableObject, CaptureSessionControllerDel
 
         phaseLabel = phase.rawValue
         var auxParts: [String] = []
+        if !sceneHints.isEmpty {
+            auxParts.append(sceneHints.joined(separator: " "))
+        }
         if let d = lastDeliveredLine, stateLine != d {
             auxParts.append(d)
         }

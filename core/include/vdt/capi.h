@@ -51,6 +51,16 @@ void vdt_encoded_session_free(VDTEncodedSession* session);
 VDTEncodedSession* vdt_transfer_loop_cycle(uint32_t transfer_id, const uint8_t* message, size_t message_length,
                                            uint8_t encoding_mode, uint16_t max_payload_bytes);
 
+/// Bit in `loop_flags` for `vdt_transfer_loop_cycle_ex`: append a duplicate descriptor after the last payload.
+#define VDT_LOOP_FLAG_TRAILING_DESCRIPTOR 1u
+
+/// Extended loop build (Phase 5). Normal mode: `repeat_descriptor_every_k_payloads` inserts an extra descriptor
+/// before payload index `i` when `i > 0 && (i % k) == 0` (`0` = default single leading descriptor). Safe mode: same
+/// `trailing_descriptor` flag applies; periodic field is ignored for ordering.
+VDTEncodedSession* vdt_transfer_loop_cycle_ex(uint32_t transfer_id, const uint8_t* message, size_t message_length,
+                                              uint8_t encoding_mode, uint16_t max_payload_bytes,
+                                              uint16_t repeat_descriptor_every_k_payloads, uint32_t loop_flags);
+
 /// Pixel-space cell rectangle for a row-major grid inside the viewport.
 void vdt_layout_cell_rect(uint32_t viewport_width, uint32_t viewport_height, uint16_t grid_rows, uint16_t grid_cols,
                           uint32_t margin_px, uint32_t gap_px, uint16_t row, uint16_t col, float* out_x0,

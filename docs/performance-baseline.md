@@ -44,8 +44,25 @@ Fill after measurements:
 | Motion | Streaks, inter-frame disagreement | Faster exposure; majority vote |
 | Geometry | Warped grid | Homography + margin tuning |
 
+## Phase 5 — reliability levers (reference, not lab-measured here)
+
+Use these when filling the throughput worksheet above; numbers are **design intent** until you replace them with device trials.
+
+| Lever | Location | Expected effect |
+|-------|----------|-----------------|
+| Descriptor every *K* payloads (Normal) | `build_transfer_loop_cycle` + `vdt_transfer_loop_cycle_ex` | Late joiners / mid-loop resync without Safe’s per-frame descriptor cost |
+| Trailing descriptor | same | Easier wrap boundary for optical receivers |
+| Duplicate-compatible descriptor | `SessionAssembler` (C++ / Python) | Safe + periodic Normal cycles no longer wipe partial assembly |
+| Temporal vote depth 1…7 | `ReceiverScreen`, `TemporalSymbolMajority` | Fewer single-frame symbol errors; more latency |
+| Adaptive cell thresholds | `LumaGridDecoder`, Python `grid_codec.lumas_to_symbols` | Low-contrast frames when min–max span is usable |
+| `--vote-frames` / `--adaptive-cells` | `decode_recorded_video.py` | Offline video grid path aligned with live receiver options |
+| Auto-stop loops (sender) | `SenderScreen` “Auto-stop (by frame count)” | `max(2, min(30, frameCount/2))` loop cap heuristic for longer cycles |
+
+**Success-rate target** remains in `constraints.md` (e.g. ≥95% at nominal distance); record **before/after** in the throughput table once you have two comparable runs.
+
 ## Revision log
 
 | Date | Author | Change |
 |------|--------|--------|
 | — | — | Template created |
+| 2025-03-20 | — | Phase 5 reference table + measurement reminder |

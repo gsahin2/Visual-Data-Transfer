@@ -51,18 +51,23 @@ Descriptor frames use the same outer header as payload frames: `chunk_index = 0`
 
 ## Loop strategy (sender)
 
-One **loop cycle** is built by `vdt::encode::build_transfer_loop_cycle` (and `vdt_transfer_loop_cycle` in the C API):
+One **loop cycle** is built by `vdt::encode::build_transfer_loop_cycle` (and `vdt_transfer_loop_cycle` / `vdt_transfer_loop_cycle_ex` in the C API):
 
 | Mode | Order within a cycle |
 |------|----------------------|
 | **Normal** | `[Descriptor] [Payload₀ … Payloadₙ₋₁]` |
 | **Safe** | `[Descriptor][Payload₀][Descriptor][Payload₁]…` |
 
+**Phase 5 options** (`TransferLoopOptions` / `vdt_transfer_loop_cycle_ex`):
+
+- **Normal:** `repeat_descriptor_every_k_payloads = K` (`K > 0`) inserts an extra descriptor before payload index `i` when `i > 0 && (i % K) == 0` (e.g. `K = 2` → `D P₀ P₁ D P₂ P₃ …`). `K = 0` keeps the single leading descriptor.
+- **Normal / Safe:** `trailing_descriptor` appends a duplicate descriptor after the last payload (wrap / late-join).
+
 The UI / scheduler **repeats** this cycle for the target wall-clock duration (Phase 2). Decoders treat repeated identical chunk indices as **redundant** (same bytes → success; conflicting bytes → error).
 
 ## Receiver assembly
 
-1. Parse **Descriptor** whenever seen; refresh `SessionReassemblyBuffer` with `data_frame_count`.
+1. Parse **Descriptor** whenever seen. If a descriptor’s `(transfer_id, data_frame_count, payload_byte_length, payload_crc32)` matches the **already accepted** descriptor for this session, the frame is a **no-op** (partial slots are kept). Otherwise `SessionReassemblyBuffer` resets from the new descriptor.
 2. Ingest **Payload** frames in any order **by chunk index** until all slots filled.
 3. When a descriptor was processed, `SessionAssembler::take_merged_payload` checks **byte length** and **CRC-32** before returning data.
 4. If no descriptor was seen (legacy path), assembly uses header `chunk_count` only and **skips** CRC32 verification at take time.

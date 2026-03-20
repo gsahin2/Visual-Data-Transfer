@@ -24,6 +24,13 @@ bool SessionAssembler::push_frame(const DecodedFrame& frame) {
     if (!parsed.has_value()) {
       return false;
     }
+    // Repeat descriptors (Safe / periodic Normal / trailing) must not wipe partial slots when metadata matches.
+    if (descriptor_seen_ && active_session_.has_value() && *active_session_ == parsed->transfer_id &&
+        expected_chunks_.has_value() && *expected_chunks_ == parsed->data_frame_count &&
+        expected_payload_bytes_.has_value() && *expected_payload_bytes_ == parsed->payload_byte_length &&
+        expected_payload_crc32_.has_value() && *expected_payload_crc32_ == parsed->payload_crc32) {
+      return true;
+    }
     protocol::SessionDescriptor desc{};
     desc.session_id = parsed->transfer_id;
     desc.chunk_count = parsed->data_frame_count;

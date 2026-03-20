@@ -73,6 +73,8 @@ This roadmap tracks delivery of **reliable ~20 KB** transfers via **looping visu
 
 **Deliverables:** Measurable success-rate gains; stable UX.
 
+**Progress (repo):** `TransferLoopOptions` + `vdt_transfer_loop_cycle_ex`; duplicate-compatible descriptors in `SessionAssembler` (C++ / Python); sender cadence UI + auto-stop by frame count; receiver vote depth + scene hints; Python `--vote-frames` / `--adaptive-cells`; `performance-baseline.md` Phase 5 reference table.
+
 ## Phase 6 — Product integration
 
 **Goal:** Ship as a feature + SDK.

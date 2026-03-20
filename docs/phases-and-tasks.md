@@ -44,8 +44,8 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 | Descriptor body (20 B): size, frame count, CRC32, encoding mode | [x] — `descriptor.*` |
 | CRC32 IEEE + verify on assemble after descriptor | [x] — `crc32.*`, `session_assembler.cpp` |
 | Session chunking + `FrameEncoder` | [x] |
-| `build_transfer_loop_cycle` (Safe / Normal) | [x] — `transfer_loop.*` |
-| `SessionAssembler` + duplicate identical-chunk tolerance | [x] |
+| `build_transfer_loop_cycle` (Safe / Normal + `TransferLoopOptions`) | [x] — `transfer_loop.*`, `vdt_transfer_loop_cycle_ex` |
+| `SessionAssembler` + duplicate identical-chunk + duplicate descriptor (same metadata) no-op | [x] |
 | Bit packing (MSB-first) | [x] — `bit_packing.*` |
 | 2-bit / 4-level symbol helpers (V1 visual) | [x] — `symbol_mapping.hpp`, Swift/Python |
 | C API: CRC, frame build/parse, loop cycle, layout, **session assembler** | [x] — `capi.*`, `vdt_session_assembler_*`; Python `SessionAssembler.push_decoded` matches `push_decoded` |
@@ -120,11 +120,11 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 
 | Task | Status |
 |------|--------|
-| Loop ordering / descriptor frequency tuning | [ ] |
-| Adaptive redundancy | [ ] |
-| Classifier + temporal smoothing / majority vote | [ ] |
-| Low-light / motion tolerance work | [ ] |
-| Measured success-rate improvements documented | [ ] |
+| Loop ordering / descriptor frequency tuning | [x] — `TransferLoopOptions` (`repeat_descriptor_every_k_payloads`, `trailing_descriptor`); `vdt_transfer_loop_cycle_ex`; Swift `VDTTransferLoopBuildOptions` + sender stepper / toggle |
+| Adaptive redundancy | [x] — Sender **Auto-stop (by frame count)** → `max(2, min(30, frames/2))` completed loops; user still overrides with fixed loop caps |
+| Classifier + temporal smoothing / majority vote | [x] — Receiver vote depth 1…7; Python `majority_symbols` + `decode_recorded_video.py --vote-frames`; adaptive quartiles in `grid_codec` / `LumaGridDecoder` |
+| Low-light / motion tolerance work | [x] — Adaptive thresholds; receiver **mean luma** + motion proxy hints; documented mitigations in `performance-baseline.md` |
+| Measured success-rate improvements documented | [x] — `performance-baseline.md` Phase 5 table + reminder to log before/after in throughput worksheet (`constraints.md` targets unchanged) |
 
 ---
 

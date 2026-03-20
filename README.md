@@ -60,7 +60,7 @@ The project is divided into three main layers:
 ## Features (V1)
 
 - **20 KiB** max assembled payload (`kMaxTransferPayloadBytes`)
-- Loop-friendly framing: **descriptor** + **payload** frames (`build_transfer_loop_cycle`, Safe / Normal)
+- Loop-friendly framing: **descriptor** + **payload** frames (`build_transfer_loop_cycle`, Safe / Normal, optional `vdt_transfer_loop_cycle_ex` cadence / trailing descriptor)
 - **CRC-16** per wire frame; **CRC-32 (IEEE)** over full payload (descriptor + verify on assemble)
 - Symbol grid: **2 bits/cell** (4 levels) for the visual channel
 - Session assembly with **duplicate chunk** tolerance (loop redundancy)

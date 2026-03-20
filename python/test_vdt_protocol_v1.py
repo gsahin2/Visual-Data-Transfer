@@ -5,6 +5,8 @@ from __future__ import annotations
 import unittest
 from typing import Tuple
 
+from grid_codec import majority_symbols
+
 from vdt_protocol_v1 import (
     FRAME_DESCRIPTOR,
     FRAME_PAYLOAD,
@@ -111,6 +113,38 @@ class TestSessionAssemblerPushDecoded(unittest.TestCase):
         self.assertTrue(asm.push_decoded(h_pay, msg))
         h_pay2 = FrameHeader(VERSION1, FRAME_PAYLOAD, 0, 3, 0, 1, 3)
         self.assertFalse(asm.push_decoded(h_pay2, b"two"))
+
+    def test_duplicate_descriptor_preserves_partial_chunks(self) -> None:
+        a, b = b"abcd", b"efgh"
+        msg = a + b
+        crc = crc32_ieee(msg) & 0xFFFFFFFF
+        sid = 99
+        desc = TransferDescriptorV1(
+            transfer_id=sid,
+            payload_byte_length=len(msg),
+            payload_crc32=crc,
+            data_frame_count=2,
+        )
+        body = desc.serialize()
+        h_desc = FrameHeader(VERSION1, FRAME_DESCRIPTOR, 0, sid, 0, 1, len(body))
+        h_p0 = FrameHeader(VERSION1, FRAME_PAYLOAD, 0, sid, 0, 2, len(a))
+        h_p1 = FrameHeader(VERSION1, FRAME_PAYLOAD, 0, sid, 1, 2, len(b))
+        asm = SessionAssembler()
+        self.assertTrue(asm.push_decoded(h_desc, body))
+        self.assertTrue(asm.push_decoded(h_p0, a))
+        self.assertTrue(asm.push_decoded(h_desc, body))
+        self.assertFalse(asm.is_complete())
+        self.assertTrue(asm.push_decoded(h_p1, b))
+        self.assertTrue(asm.is_complete())
+        self.assertEqual(asm.take_payload(), msg)
+
+
+class TestMajoritySymbols(unittest.TestCase):
+    def test_plurality_per_cell(self) -> None:
+        a = [0, 1, 2, 3]
+        b = [0, 1, 2, 0]
+        c = [0, 2, 2, 3]
+        self.assertEqual(majority_symbols([a, b, c]), [0, 1, 2, 3])
 
 
 if __name__ == "__main__":

@@ -4,6 +4,8 @@ public struct SenderScreen: View {
     @State private var text: String = "Hello, VDT"
     @State private var sessionId: UInt32 = 1
     @State private var encodingMode: VDTEncodingMode = .normal
+    @State private var repeatDescriptorEveryK: Int = 0
+    @State private var trailingDescriptor: Bool = false
     @State private var encoded: VDTFramedSession?
     @State private var repeatCap: LoopRepeatCap = .untilPaused
     @StateObject private var loopPlayer = TransferLoopPlayer()
@@ -32,11 +34,34 @@ public struct SenderScreen: View {
                 }
             }
             .pickerStyle(.segmented)
+            if encodingMode == .normal {
+                Stepper(value: $repeatDescriptorEveryK, in: 0...8) {
+                    Text(
+                        repeatDescriptorEveryK == 0
+                            ? "Descriptor: once at start (Normal)"
+                            : "Descriptor every \(repeatDescriptorEveryK) payload(s)"
+                    )
+                    .font(.footnote)
+                }
+            }
+            Toggle("Trailing descriptor (after last payload)", isOn: $trailingDescriptor)
+                .font(.footnote)
             Button("Encode loop cycle (core)") {
                 let data = Data(text.utf8)
-                encoded = VDTFramedSession(sessionId: sessionId, message: data, encodingMode: encodingMode)
+                let k = encodingMode == .normal ? repeatDescriptorEveryK : 0
+                let loopOpts = VDTTransferLoopBuildOptions(
+                    repeatDescriptorEveryKPayloads: UInt16(clamping: k),
+                    trailingDescriptor: trailingDescriptor
+                )
+                encoded = VDTFramedSession(
+                    sessionId: sessionId,
+                    message: data,
+                    encodingMode: encodingMode,
+                    loopOptions: loopOpts
+                )
                 if let encoded {
                     loopPlayer.load(frames: encoded.frames.map(\.data))
+                    applyRepeatCapPolicy(frameCount: encoded.frames.count)
                 }
             }
             .buttonStyle(.borderedProminent)
@@ -72,8 +97,8 @@ public struct SenderScreen: View {
                 }
                 .font(.footnote)
                 .foregroundStyle(.secondary)
-                .onChange(of: repeatCap) { opt in
-                    loopPlayer.maxCompletedLoops = opt.maxLoops
+                .onChange(of: repeatCap) { _ in
+                    applyRepeatCapPolicy(frameCount: encoded.frames.count)
                 }
             }
 
@@ -106,10 +131,21 @@ public struct SenderScreen: View {
         }
         .padding()
     }
+
+    private func applyRepeatCapPolicy(frameCount: Int) {
+        switch repeatCap {
+        case .adaptive:
+            let n = max(2, min(30, frameCount / 2))
+            loopPlayer.maxCompletedLoops = n
+        default:
+            loopPlayer.maxCompletedLoops = repeatCap.maxLoops
+        }
+    }
 }
 
 private enum LoopRepeatCap: String, CaseIterable, Identifiable {
     case untilPaused
+    case adaptive
     case one
     case three
     case ten
@@ -119,6 +155,7 @@ private enum LoopRepeatCap: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .untilPaused: return "Until paused"
+        case .adaptive: return "Auto-stop (by frame count)"
         case .one: return "After 1 loop"
         case .three: return "After 3 loops"
         case .ten: return "After 10 loops"
@@ -128,6 +165,7 @@ private enum LoopRepeatCap: String, CaseIterable, Identifiable {
     var maxLoops: Int? {
         switch self {
         case .untilPaused: return nil
+        case .adaptive: return nil
         case .one: return 1
         case .three: return 3
         case .ten: return 10

@@ -11,7 +11,8 @@ namespace vdt::decode {
 
 /// Accepts decoded frames and reconstructs the transfer payload.
 /// Descriptor frames (repeated in the loop) establish expected CRC32 and chunk count; payload frames fill slots.
-/// Duplicate payload chunks with identical bytes are tolerated (loop redundancy).
+/// Duplicate payload chunks with identical bytes are tolerated (loop redundancy). Duplicate descriptors whose
+/// metadata matches the active session are ignored so partial assembly is not cleared (Safe / periodic Normal).
 class SessionAssembler {
  public:
   void reset();

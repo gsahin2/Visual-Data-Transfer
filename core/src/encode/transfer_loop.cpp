@@ -8,7 +8,8 @@ namespace vdt::encode {
 std::vector<EncodedFrame> build_transfer_loop_cycle(const std::uint32_t transfer_id,
                                                    const std::span<const std::uint8_t> message,
                                                    const protocol::EncodingMode mode,
-                                                   const std::uint16_t max_payload_bytes) {
+                                                   const std::uint16_t max_payload_bytes,
+                                                   const TransferLoopOptions& options) {
   if (message.size() > protocol::kMaxTransferPayloadBytes) {
     return {};
   }
@@ -46,14 +47,24 @@ std::vector<EncodedFrame> build_transfer_loop_cycle(const std::uint32_t transfer
   std::vector<EncodedFrame> out;
   if (mode == protocol::EncodingMode::Normal) {
     out.push_back(make_descriptor_frame());
-    for (auto& f : data_frames) {
-      out.push_back(std::move(f));
+    const std::uint16_t k = options.repeat_descriptor_every_k_payloads;
+    for (std::size_t i = 0; i < data_frames.size(); ++i) {
+      if (k > 0 && i > 0 && (i % static_cast<std::size_t>(k)) == 0) {
+        out.push_back(make_descriptor_frame());
+      }
+      out.push_back(std::move(data_frames[i]));
+    }
+    if (options.trailing_descriptor) {
+      out.push_back(make_descriptor_frame());
     }
     return out;
   }
   for (auto& f : data_frames) {
     out.push_back(make_descriptor_frame());
     out.push_back(std::move(f));
+  }
+  if (options.trailing_descriptor) {
+    out.push_back(make_descriptor_frame());
   }
   return out;
 }

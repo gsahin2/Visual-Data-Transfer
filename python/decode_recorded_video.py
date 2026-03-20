@@ -7,7 +7,7 @@ With `--assemble-grid`, each successful `parse_frame` is passed to `SessionAssem
 from __future__ import annotations
 
 import argparse
-from collections import Counter
+from collections import Counter, deque
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -21,7 +21,12 @@ except ImportError as exc:  # pragma: no cover - optional dependency path
 else:
     _cv_import_error = None
 
-from grid_codec import decode_grid_from_ndarray_bgr
+from grid_codec import (
+    bitstream_to_bytes,
+    grid_symbols_from_ndarray_bgr,
+    majority_symbols,
+    symbols_to_bitstream,
+)
 from vdt_protocol_v1 import FRAME_DESCRIPTOR, FRAME_PAYLOAD, SessionAssembler, parse_frame
 
 
@@ -106,6 +111,8 @@ def decode_video_grid(
     assemble_grid: bool,
     write_assembled: Optional[Path],
     quiet: bool,
+    vote_frames: int,
+    adaptive_cells: bool,
 ) -> None:
     if cv2 is None:
         raise SystemExit(f"OpenCV is required: {_cv_import_error}")
@@ -128,6 +135,8 @@ def decode_video_grid(
     last_assembled_preview: Optional[bytes] = None
     assembled_seq = 0
     last_grid_frame_index = -1
+    vf = max(1, vote_frames)
+    sym_history: deque[List[int]] = deque(maxlen=vf)
 
     def save_assembled_payload(merged: bytes, frame_idx: int) -> None:
         nonlocal assembled_seq
@@ -149,7 +158,10 @@ def decode_video_grid(
         if resize_wh is not None:
             rw, rh = resize_wh
             frame = cv2.resize(frame, (rw, rh), interpolation=cv2.INTER_AREA)
-        blob = decode_grid_from_ndarray_bgr(frame, rows, cols, margin, gap, byte_length)
+        syms = grid_symbols_from_ndarray_bgr(frame, rows, cols, margin, gap, adaptive_cells)
+        sym_history.append(syms)
+        voted = majority_symbols(list(sym_history)) if vf > 1 else syms
+        blob = bitstream_to_bytes(symbols_to_bitstream(voted), max_bytes=byte_length)
         decoded.append(blob)
         preview = blob[:24]
         extra = ""
@@ -203,7 +215,8 @@ def decode_video_grid(
     print("---")
     print(
         f"read: {frames_read} video frames  decoded: {processed}  "
-        f"stride={stride} (not decoded due to stride: {skipped_stride})  stop={stop_reason}"
+        f"stride={stride} (not decoded due to stride: {skipped_stride})  stop={stop_reason}  "
+        f"vote_frames={vf}  adaptive_cells={adaptive_cells}"
     )
     if try_parse_wire:
         print(
@@ -298,6 +311,17 @@ def main() -> None:
         action="store_true",
         help="With --decode-grid: no per-frame lines; still print summary stats",
     )
+    parser.add_argument(
+        "--vote-frames",
+        type=int,
+        default=1,
+        help="With --decode-grid: per-cell majority over last N symbol frames (temporal smoothing)",
+    )
+    parser.add_argument(
+        "--adaptive-cells",
+        action="store_true",
+        help="With --decode-grid: min–max quartile thresholds per frame (low-light contrast stretch)",
+    )
     args = parser.parse_args()
 
     resize_wh: Optional[Tuple[int, int]] = None
@@ -330,6 +354,8 @@ def main() -> None:
             args.assemble_grid,
             args.write_assembled,
             args.quiet,
+            args.vote_frames,
+            args.adaptive_cells,
         )
     elif args.video is not None:
         scan_video(args.video, args.max_frames)

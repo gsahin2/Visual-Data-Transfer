@@ -176,6 +176,13 @@ class SessionAssembler:
             desc = TransferDescriptorV1.parse(payload)
             if desc is None:
                 return False
+            if self._descriptor_seen and self._sid == desc.transfer_id and self._expect_chunks is not None:
+                if (
+                    self._expect_chunks == desc.data_frame_count
+                    and self._expect_len == desc.payload_byte_length
+                    and (self._expect_crc & 0xFFFFFFFF) == (desc.payload_crc32 & 0xFFFFFFFF)
+                ):
+                    return True
             self._descriptor_seen = True
             self._chunks = {}
             self._expect_chunks = desc.data_frame_count

@@ -23,6 +23,39 @@ struct VDTSessionAssembler {
   vdt::decode::SessionAssembler inner;
 };
 
+namespace {
+
+VDTEncodedSession* encoded_session_from_encoded_frames(std::vector<vdt::encode::EncodedFrame>&& frames) {
+  auto* session = static_cast<VDTEncodedSession*>(std::malloc(sizeof(VDTEncodedSession)));
+  if (session == nullptr) {
+    return nullptr;
+  }
+  session->frame_data = nullptr;
+  session->frame_sizes = nullptr;
+  session->frame_count = frames.size();
+  if (session->frame_count == 0) {
+    return session;
+  }
+  session->frame_data = static_cast<uint8_t**>(std::calloc(session->frame_count, sizeof(uint8_t*)));
+  session->frame_sizes = static_cast<size_t*>(std::calloc(session->frame_count, sizeof(size_t)));
+  if (session->frame_data == nullptr || session->frame_sizes == nullptr) {
+    vdt_encoded_session_free(session);
+    return nullptr;
+  }
+  for (size_t i = 0; i < session->frame_count; ++i) {
+    session->frame_sizes[i] = frames[i].wire.size();
+    session->frame_data[i] = static_cast<uint8_t*>(std::malloc(frames[i].wire.size()));
+    if (session->frame_data[i] == nullptr) {
+      vdt_encoded_session_free(session);
+      return nullptr;
+    }
+    std::memcpy(session->frame_data[i], frames[i].wire.data(), frames[i].wire.size());
+  }
+  return session;
+}
+
+}  // namespace
+
 extern "C" {
 
 uint16_t vdt_crc16(const uint8_t* data, const size_t length) {
@@ -132,38 +165,24 @@ VDTEncodedSession* vdt_encode_session(const uint32_t session_id, const uint8_t* 
 VDTEncodedSession* vdt_transfer_loop_cycle(const uint32_t transfer_id, const uint8_t* message,
                                            const size_t message_length, const uint8_t encoding_mode,
                                            const uint16_t max_payload_bytes) {
+  return vdt_transfer_loop_cycle_ex(transfer_id, message, message_length, encoding_mode, max_payload_bytes, 0, 0);
+}
+
+VDTEncodedSession* vdt_transfer_loop_cycle_ex(const uint32_t transfer_id, const uint8_t* message,
+                                            const size_t message_length, const uint8_t encoding_mode,
+                                            const uint16_t max_payload_bytes,
+                                            const uint16_t repeat_descriptor_every_k_payloads,
+                                            const uint32_t loop_flags) {
   if (message == nullptr && message_length > 0) {
     return nullptr;
   }
   const auto mode = encoding_mode == 0 ? vdt::protocol::EncodingMode::Safe : vdt::protocol::EncodingMode::Normal;
   const std::span<const uint8_t> msg(message, message_length);
-  const auto frames = vdt::encode::build_transfer_loop_cycle(transfer_id, msg, mode, max_payload_bytes);
-  auto* session = static_cast<VDTEncodedSession*>(std::malloc(sizeof(VDTEncodedSession)));
-  if (session == nullptr) {
-    return nullptr;
-  }
-  session->frame_data = nullptr;
-  session->frame_sizes = nullptr;
-  session->frame_count = frames.size();
-  if (session->frame_count == 0) {
-    return session;
-  }
-  session->frame_data = static_cast<uint8_t**>(std::calloc(session->frame_count, sizeof(uint8_t*)));
-  session->frame_sizes = static_cast<size_t*>(std::calloc(session->frame_count, sizeof(size_t)));
-  if (session->frame_data == nullptr || session->frame_sizes == nullptr) {
-    vdt_encoded_session_free(session);
-    return nullptr;
-  }
-  for (size_t i = 0; i < session->frame_count; ++i) {
-    session->frame_sizes[i] = frames[i].wire.size();
-    session->frame_data[i] = static_cast<uint8_t*>(std::malloc(frames[i].wire.size()));
-    if (session->frame_data[i] == nullptr) {
-      vdt_encoded_session_free(session);
-      return nullptr;
-    }
-    std::memcpy(session->frame_data[i], frames[i].wire.data(), frames[i].wire.size());
-  }
-  return session;
+  vdt::encode::TransferLoopOptions opt{};
+  opt.repeat_descriptor_every_k_payloads = repeat_descriptor_every_k_payloads;
+  opt.trailing_descriptor = (loop_flags & VDT_LOOP_FLAG_TRAILING_DESCRIPTOR) != 0;
+  auto frames = vdt::encode::build_transfer_loop_cycle(transfer_id, msg, mode, max_payload_bytes, opt);
+  return encoded_session_from_encoded_frames(std::move(frames));
 }
 
 void vdt_encoded_session_free(VDTEncodedSession* session) {

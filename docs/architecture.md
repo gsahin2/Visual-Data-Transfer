@@ -21,7 +21,7 @@ Visual Data Transfer separates **protocol and vision mathematics** from **platfo
 
 ## Data flow (sender)
 
-1. Application payload (bytes) enters the **encoder**, which chunks according to `kMaxPayloadBytesPerFrame` (1024 B) until the full message (≤ **20 KiB**, `kMaxTransferPayloadBytes`) is covered. A **loop cycle** prepends descriptor frame(s) per `EncodingMode` (`build_transfer_loop_cycle`).
+1. Application payload (bytes) enters the **encoder**, which chunks according to `kMaxPayloadBytesPerFrame` (1024 B) until the full message (≤ **20 KiB**, `kMaxTransferPayloadBytes`) is covered. A **loop cycle** orders descriptor + payload frames per `EncodingMode` and optional `TransferLoopOptions` (`build_transfer_loop_cycle`, `vdt_transfer_loop_cycle_ex`).
 2. Each chunk becomes a **wire frame**: fixed header + payload + CRC16 over header+payload.
 3. Swift **renders** the *visual* channel (grid of symbols, **2 bits/cell** in V1) deterministically from the same payload bytes (orthogonal to wire chunking; see `docs/constraints.md`).
 
@@ -33,7 +33,7 @@ Visual Data Transfer separates **protocol and vision mathematics** from **platfo
 
 ## Bridging
 
-The stable C API in `core/include/vdt/capi.h` is mirrored under `core/ffi/include` for Swift Package Manager. Swift code should call these entry points instead of reimplementing protocol rules. Session reassembly is exposed as `vdt_session_assembler_*` (opaque handle, `push_wire` / `push_decoded`, `take_merged_payload`); the kit wraps this in `VDTSessionReassembler`.
+The stable C API in `core/include/vdt/capi.h` is mirrored under `core/ffi/include` for Swift Package Manager. Swift code should call these entry points instead of reimplementing protocol rules. Session reassembly is exposed as `vdt_session_assembler_*` (opaque handle, `push_wire` / `push_decoded`, `take_merged_payload`); the kit wraps this in `VDTSessionReassembler`. Repeated **identical** descriptors are ignored so Safe / periodic Normal cycles do not clear partial chunk buffers.
 
 ## Build surfaces
 
