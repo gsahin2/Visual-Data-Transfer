@@ -5,6 +5,7 @@ public struct SenderScreen: View {
     @State private var sessionId: UInt32 = 1
     @State private var encodingMode: VDTEncodingMode = .normal
     @State private var encoded: VDTFramedSession?
+    @StateObject private var loopPlayer = TransferLoopPlayer()
 
     private let grid = VDTLayoutSpec(viewportWidth: 390, viewportHeight: 844, gridRows: 12, gridCols: 20)
 
@@ -33,6 +34,9 @@ public struct SenderScreen: View {
             Button("Encode loop cycle (core)") {
                 let data = Data(text.utf8)
                 encoded = VDTFramedSession(sessionId: sessionId, message: data, encodingMode: encodingMode)
+                if let encoded {
+                    loopPlayer.load(frames: encoded.frames.map(\.data))
+                }
             }
             .buttonStyle(.borderedProminent)
 
@@ -40,23 +44,38 @@ public struct SenderScreen: View {
                 Text("Frames: \(encoded.frames.count)  CRC16: \(VDTCRC16.checksum(Data(text.utf8)))")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                HStack {
+                    Toggle("Play loop", isOn: $loopPlayer.isPlaying)
+                    Button("Step") { loopPlayer.stepForward() }
+                    Button("Reset") { loopPlayer.reset() }
+                }
+                .font(.subheadline)
+                HStack {
+                    Text("FPS")
+                    Slider(value: $loopPlayer.framesPerSecond, in: 4...24, step: 1)
+                    Text("\(Int(loopPlayer.framesPerSecond))")
+                        .monospacedDigit()
+                        .frame(width: 28, alignment: .trailing)
+                }
             }
 
             GeometryReader { proxy in
                 let w = UInt32(max(1, Int(proxy.size.width.rounded())))
                 let h = UInt32(max(1, Int(proxy.size.height.rounded())))
-                SymbolGridView(
-                    message: Data(text.utf8),
-                    spec: VDTLayoutSpec(
-                        viewportWidth: w,
-                        viewportHeight: h,
-                        gridRows: grid.gridRows,
-                        gridCols: grid.gridCols,
-                        marginPx: grid.marginPx,
-                        gapPx: grid.gapPx
-                    )
+                let spec = VDTLayoutSpec(
+                    viewportWidth: w,
+                    viewportHeight: h,
+                    gridRows: grid.gridRows,
+                    gridCols: grid.gridCols,
+                    marginPx: grid.marginPx,
+                    gapPx: grid.gapPx
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                if let encoded, !encoded.frames.isEmpty {
+                    SenderTransmissionView(spec: spec, player: loopPlayer)
+                } else {
+                    SymbolGridView(message: Data(text.utf8), spec: spec)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
             }
         }
         .padding()

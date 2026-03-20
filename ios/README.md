@@ -3,7 +3,7 @@
 `VisualDataTransferKit` ships as a SwiftPM library product and includes:
 
 - **C bridge** — wraps `vdt_*` functions from `VDTCoreC` (built from `core/` sources).
-- **Sender** — `SenderScreen` renders a deterministic symbol grid and can frame messages through `VDTFramedSession`.
+- **Sender** — `SenderScreen` builds a loop cycle via `VDTFramedSession`, drives **`TransferLoopPlayer`** (FPS / play), and **`SenderTransmissionView`** shows each wire frame (payload grid vs descriptor panel) with **corner markers** (`CornerMarkersView`).
 - **Receiver** — `ReceiverScreen` + `CaptureSessionController` deliver grayscale buffers for future vision hooks.
 
 ## Integrating into an Xcode app

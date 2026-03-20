@@ -40,6 +40,8 @@ This roadmap tracks delivery of **reliable ~20 KB** transfers via **looping visu
 
 **Deliverables:** Swift sender demo with looping transmission (extends current `SenderScreen` / scheduler).
 
+**Progress (repo):** `TransferLoopPlayer` (FPS + play/step), `SenderTransmissionView` (parse wire via `vdt_frame_parse`, DATA vs DESCRIPTOR preview), **corner L-markers** with subtle pulse (data cells unchanged). Matrix column/glow still **todo** (must not alter 2-bit classification).
+
 ## Phase 3 — Recorded decode (receiver V1)
 
 **Goal:** Decode from **video files** first (stable).
@@ -49,6 +51,8 @@ This roadmap tracks delivery of **reliable ~20 KB** transfers via **looping visu
 - Debug overlays, logging, missing-frame stats.
 
 **Deliverables:** Python or C++ recorded decoder achieving full payload reconstruction.
+
+**Progress (repo):** `python/vdt_protocol_v1.SessionAssembler` + `decode_recorded_video.py --wire-dir` to reassemble from raw `.bin` wire files (golden / simulator dumps). Video pixel path still **todo**.
 
 ## Phase 4 — Live camera receiver
 

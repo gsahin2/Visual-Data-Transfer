@@ -140,3 +140,79 @@ class TransferDescriptorV1:
         if lv != 1 or dfc == 0 or plen > MAX_TRANSFER_PAYLOAD:
             return None
         return TransferDescriptorV1(lv, em, r0, tid, plen, pcrc, dfc, r1)
+
+
+class SessionAssembler:
+    """Python mirror of C++ `vdt::decode::SessionAssembler` (descriptor + payload + CRC32)."""
+
+    def __init__(self) -> None:
+        self.reset()
+
+    def reset(self) -> None:
+        self._chunks: dict[int, bytes] = {}
+        self._descriptor_seen = False
+        self._expect_chunks: Optional[int] = None
+        self._expect_crc: Optional[int] = None
+        self._expect_len: Optional[int] = None
+        self._sid: Optional[int] = None
+
+    def push_wire(self, wire: bytes) -> bool:
+        parsed = parse_frame(wire)
+        if not parsed:
+            return False
+        hdr, payload = parsed
+        if hdr.frame_type == FRAME_DESCRIPTOR:
+            desc = TransferDescriptorV1.parse(payload)
+            if desc is None:
+                return False
+            self._descriptor_seen = True
+            self._chunks = {}
+            self._expect_chunks = desc.data_frame_count
+            self._expect_crc = desc.payload_crc32 & 0xFFFFFFFF
+            self._expect_len = desc.payload_byte_length
+            self._sid = desc.transfer_id
+            return True
+        if hdr.frame_type != FRAME_PAYLOAD:
+            return False
+        if hdr.chunk_count == 0:
+            return False
+        if not self._descriptor_seen:
+            if self._expect_chunks is None:
+                self._expect_chunks = hdr.chunk_count
+                self._sid = hdr.session_id
+            elif hdr.session_id != self._sid or hdr.chunk_count != self._expect_chunks:
+                return False
+        else:
+            if hdr.session_id != self._sid or hdr.chunk_count != self._expect_chunks:
+                return False
+        idx = hdr.chunk_index
+        if idx in self._chunks:
+            return self._chunks[idx] == payload
+        self._chunks[idx] = payload
+        return True
+
+    def is_complete(self) -> bool:
+        if self._expect_chunks is None:
+            return False
+        return len(self._chunks) == self._expect_chunks and all(
+            i in self._chunks for i in range(self._expect_chunks)
+        )
+
+    def take_payload(self) -> Optional[bytes]:
+        if not self.is_complete():
+            return None
+        assert self._expect_chunks is not None
+        merged = b"".join(self._chunks[i] for i in range(self._expect_chunks))
+        if self._descriptor_seen:
+            if self._expect_len is None or self._expect_crc is None:
+                self.reset()
+                return None
+            if len(merged) != self._expect_len:
+                self.reset()
+                return None
+            if (crc32_ieee(merged) & 0xFFFFFFFF) != (self._expect_crc & 0xFFFFFFFF):
+                self.reset()
+                return None
+        out = merged
+        self.reset()
+        return out

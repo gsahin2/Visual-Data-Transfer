@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Scan a recorded video for V1 frames (CRC-valid) and dump payload sizes.
+Recorded video scaffold OR offline reassembly from raw wire `.bin` files.
 
-Full vision decoding belongs in the C++ core; this tool validates tooling and capture pipelines.
+Vision decoding from pixels is Phase 3; `--wire-dir` exercises the session assembler today.
 """
 
 from __future__ import annotations
@@ -21,33 +21,42 @@ except ImportError as exc:  # pragma: no cover - optional dependency path
 else:
     _cv_import_error = None
 
-from vdt_protocol_v1 import HEADER_BYTES, parse_frame
+from vdt_protocol_v1 import SessionAssembler, parse_frame
 
 
 def scan_frame_buffer(gray: np.ndarray) -> Optional[bytes]:
-    """
-    Placeholder hook: in a full pipeline, homography + grid sampling would recover bytes.
-    Here we only demonstrate I/O around OpenCV frames.
-    """
+    """Placeholder: homography + grid sampling would produce wire bytes here."""
     _ = gray
     return None
 
 
-def main() -> None:
+def reassemble_wire_directory(directory: Path) -> None:
+    asm = SessionAssembler()
+    files = sorted(directory.glob("*.bin"))
+    if not files:
+        raise SystemExit(f"No .bin files in {directory}")
+    for path in files:
+        wire = path.read_bytes()
+        ok = asm.push_wire(wire)
+        print(f"{path.name}: push {'ok' if ok else 'FAIL'}")
+    if asm.is_complete():
+        payload = asm.take_payload()
+        if payload is None:
+            print("Assembler rejected payload (CRC/size).")
+        else:
+            print(f"Assembled {len(payload)} bytes: {payload[:120]!r}{'...' if len(payload) > 120 else ''}")
+    else:
+        print("Incomplete session (need full descriptor + payload frames).")
+
+
+def scan_video(path: Path, max_frames: int) -> None:
     if cv2 is None:
         raise SystemExit(f"OpenCV is required: {_cv_import_error}")
-
-    parser = argparse.ArgumentParser(description="Decode / inspect recorded VDT video (scaffold).")
-    parser.add_argument("video", type=Path, help="Input video path")
-    parser.add_argument("--max-frames", type=int, default=200, help="Frames to scan")
-    args = parser.parse_args()
-
-    cap = cv2.VideoCapture(str(args.video))
+    cap = cv2.VideoCapture(str(path))
     if not cap.isOpened():
         raise SystemExit("Unable to open video")
-
     found = 0
-    for i in range(args.max_frames):
+    for i in range(max_frames):
         ok, frame = cap.read()
         if not ok:
             break
@@ -58,9 +67,23 @@ def main() -> None:
             if parsed:
                 found += 1
                 print(f"frame {i}: payload {len(parsed[1])} bytes")
-
     cap.release()
-    print(f"Scanned {args.max_frames} frames, structured hits: {found}")
+    print(f"Scanned {max_frames} frames, structured hits: {found}")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="VDT video scaffold or wire-dir reassembly.")
+    parser.add_argument("video", nargs="?", type=Path, default=None, help="Input video path")
+    parser.add_argument("--wire-dir", type=Path, default=None, help="Folder of wire frames (*.bin) to reassemble")
+    parser.add_argument("--max-frames", type=int, default=200, help="Video frames to scan")
+    args = parser.parse_args()
+
+    if args.wire_dir is not None:
+        reassemble_wire_directory(args.wire_dir)
+    elif args.video is not None:
+        scan_video(args.video, args.max_frames)
+    else:
+        parser.error("Provide a video path or --wire-dir")
 
 
 if __name__ == "__main__":
