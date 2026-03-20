@@ -44,6 +44,11 @@ private final class IOSDisplayLinkAdapter: NSObject {
 @MainActor
 public final class TransferLoopPlayer: ObservableObject {
     @Published public private(set) var frameIndex: Int = 0
+    /// Number of times playback wrapped from the last frame back to index `0` (full loop cycles completed).
+    @Published public private(set) var completedLoopCount: Int = 0
+    /// When set, `isPlaying` becomes `false` after this many **completed** loops (`nil` = run until user pauses).
+    @Published public var maxCompletedLoops: Int? = nil
+
     @Published public var isPlaying: Bool = false {
         didSet { isPlaying ? startTimer() : stopTimer() }
     }
@@ -73,6 +78,7 @@ public final class TransferLoopPlayer: ObservableObject {
     public func load(frames: [Data]) {
         self.frames = frames
         frameIndex = 0
+        completedLoopCount = 0
         if isPlaying {
             stopTimer()
             startTimer()
@@ -98,7 +104,7 @@ public final class TransferLoopPlayer: ObservableObject {
         adapter.onStep = { [weak self] in
             Task { @MainActor in
                 guard let self, !self.frames.isEmpty else { return }
-                self.frameIndex = (self.frameIndex + 1) % self.frames.count
+                self.advanceFrame()
             }
         }
         adapter.start()
@@ -109,7 +115,7 @@ public final class TransferLoopPlayer: ObservableObject {
             .autoconnect()
             .sink { [weak self] _ in
                 guard let self, !self.frames.isEmpty else { return }
-                self.frameIndex = (self.frameIndex + 1) % self.frames.count
+                self.advanceFrame()
             }
         #endif
     }
@@ -125,10 +131,23 @@ public final class TransferLoopPlayer: ObservableObject {
 
     public func stepForward() {
         guard !frames.isEmpty else { return }
-        frameIndex = (frameIndex + 1) % frames.count
+        advanceFrame()
     }
 
     public func reset() {
         frameIndex = 0
+    }
+
+    private func advanceFrame() {
+        guard !frames.isEmpty else { return }
+        let n = frames.count
+        let wasAtEnd = frameIndex == n - 1
+        frameIndex = (frameIndex + 1) % n
+        if wasAtEnd, frameIndex == 0 {
+            completedLoopCount += 1
+            if let cap = maxCompletedLoops, cap > 0, completedLoopCount >= cap {
+                isPlaying = false
+            }
+        }
     }
 }

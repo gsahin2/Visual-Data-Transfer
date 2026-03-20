@@ -5,6 +5,7 @@ public struct SenderScreen: View {
     @State private var sessionId: UInt32 = 1
     @State private var encodingMode: VDTEncodingMode = .normal
     @State private var encoded: VDTFramedSession?
+    @State private var repeatCap: LoopRepeatCap = .untilPaused
     @StateObject private var loopPlayer = TransferLoopPlayer()
 
     private let grid = VDTLayoutSpec(viewportWidth: 390, viewportHeight: 844, gridRows: 12, gridCols: 20)
@@ -57,6 +58,23 @@ public struct SenderScreen: View {
                         .monospacedDigit()
                         .frame(width: 28, alignment: .trailing)
                 }
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Loops done: \(loopPlayer.completedLoopCount)")
+                        .font(.footnote.monospacedDigit())
+                    Spacer(minLength: 8)
+                    Picker("Auto-stop", selection: $repeatCap) {
+                        ForEach(LoopRepeatCap.allCases) { opt in
+                            Text(opt.title).tag(opt)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: 180, alignment: .trailing)
+                }
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .onChange(of: repeatCap) { opt in
+                    loopPlayer.maxCompletedLoops = opt.maxLoops
+                }
             }
 
             GeometryReader { proxy in
@@ -87,5 +105,32 @@ public struct SenderScreen: View {
             }
         }
         .padding()
+    }
+}
+
+private enum LoopRepeatCap: String, CaseIterable, Identifiable {
+    case untilPaused
+    case one
+    case three
+    case ten
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .untilPaused: return "Until paused"
+        case .one: return "After 1 loop"
+        case .three: return "After 3 loops"
+        case .ten: return "After 10 loops"
+        }
+    }
+
+    var maxLoops: Int? {
+        switch self {
+        case .untilPaused: return nil
+        case .one: return 1
+        case .three: return 3
+        case .ten: return 10
+        }
     }
 }
