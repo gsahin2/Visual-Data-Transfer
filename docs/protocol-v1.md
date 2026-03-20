@@ -87,4 +87,5 @@ MSB-first bit streams for dense packing live in `vdt::common::BitWriter` / `BitR
 | Descriptor | `core/include/vdt/protocol/descriptor.hpp` |
 | Loop cycle | `core/include/vdt/encode/transfer_loop.hpp` |
 | Assembler | `core/include/vdt/decode/session_assembler.hpp` |
-| C API | `core/include/vdt/capi.h` |
+| C API | `core/include/vdt/capi.h` (`vdt_session_assembler_push_wire` / `push_decoded`, `take_merged_payload`) |
+| Python mirror | `python/vdt_protocol_v1.py` — `SessionAssembler.push_wire` / `push_decoded`, `take_payload` |

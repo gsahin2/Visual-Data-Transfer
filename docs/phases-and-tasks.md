@@ -48,7 +48,7 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 | `SessionAssembler` + duplicate identical-chunk tolerance | [x] |
 | Bit packing (MSB-first) | [x] — `bit_packing.*` |
 | 2-bit / 4-level symbol helpers (V1 visual) | [x] — `symbol_mapping.hpp`, Swift/Python |
-| C API: CRC, frame build/parse, loop cycle, layout, **session assembler** | [x] — `capi.*`, `vdt_session_assembler_*` |
+| C API: CRC, frame build/parse, loop cycle, layout, **session assembler** | [x] — `capi.*`, `vdt_session_assembler_*`; Python `SessionAssembler.push_decoded` matches `push_decoded` |
 | Unit tests (CRC16/32, frames, loop, symbols, roundtrip) | [x] — `core/tests/` |
 | `protocol-v1.md` | [x] |
 

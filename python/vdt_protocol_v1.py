@@ -160,7 +160,18 @@ class SessionAssembler:
         parsed = parse_frame(wire)
         if not parsed:
             return False
-        hdr, payload = parsed
+        return self.push_decoded(parsed[0], parsed[1])
+
+    def push_decoded(self, header: FrameHeader, payload: bytes) -> bool:
+        """
+        Ingest a logically decoded frame (same as after `parse_frame`), matching C `vdt_session_assembler_push_decoded`.
+        `len(payload)` must equal `header.payload_length` and respect `MAX_PAYLOAD_PER_FRAME`.
+        """
+        if header.payload_length > MAX_PAYLOAD_PER_FRAME or len(payload) != header.payload_length:
+            return False
+        if header.version != VERSION1:
+            return False
+        hdr = header
         if hdr.frame_type == FRAME_DESCRIPTOR:
             desc = TransferDescriptorV1.parse(payload)
             if desc is None:
