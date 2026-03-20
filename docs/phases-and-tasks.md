@@ -69,7 +69,7 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 | Matrix-style **side** strips (grid not covered) | [x] — `MatrixRainStrip` |
 | Idle + transmit preview share same inner grid width | [x] — `SenderScreen` |
 | **CADisplayLink**-locked timing vs wall clock | [x] — iOS: `CADisplayLink` in `TransferLoopPlayer`; macOS/SPM: `Timer` |
-| Matrix animation **over** data cells (decode-proven safe) | [ ] |
+| Matrix animation **over** data cells (decode-proven safe) | [x] — `MatrixRainGutterOverlay`: glyphs only in margin + inter-cell **gaps** (cell centers unchanged for `LumaGridDecoder`) |
 | Automated “loop until user stops” **product** scheduler (beyond one cycle buffer) | [~] — cycles repeat; no separate session timer |
 
 ---

@@ -45,6 +45,8 @@ Encoding mode is carried in descriptor payloads (`encoding_mode` field) and shou
 
 The **wire** still carries framed binary chunks (CRC16 per frame + session assembly). The **visual** grid is a separate channel that must stay **deterministic** and aligned with docs in `frame-layout.md`.
 
+**Sender chrome:** Decorative effects (e.g. Matrix-style glyphs) must stay in **margins and inter-cell gaps** only so **cell-center** sampling used by `LumaGridDecoder` / `grid_codec` is unchanged. See `MatrixRainGutterOverlay` in the Swift kit.
+
 ## Symbol set (V1)
 
 | Setting | Choice |

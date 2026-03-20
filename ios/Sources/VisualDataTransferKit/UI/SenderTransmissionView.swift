@@ -33,6 +33,7 @@ public struct SenderTransmissionView: View {
                     .frame(width: strip, height: innerH)
                 ZStack {
                     transmissionBackground(parsed: player.parsedCurrent, spec: localSpec)
+                    MatrixRainGutterOverlay(spec: localSpec, animating: player.isPlaying)
                     CornerMarkersView(spec: localSpec, pulse: player.isPlaying)
                     VStack {
                         Spacer()
