@@ -1,7 +1,7 @@
 import CoreGraphics
 import SwiftUI
 
-/// Deterministic 16-level symbol shading from a linear bit stream (4 bits per cell, row-major).
+/// Deterministic **2 bits per cell** (4 luminance levels), MSB-first within each byte, row-major — matches V1 constraints.
 public struct SymbolGridRenderer {
     public let rows: Int
     public let cols: Int
@@ -17,27 +17,28 @@ public struct SymbolGridRenderer {
         var byteIndex = 0
         let bytes = [UInt8](message)
         for i in 0..<totalCells {
-            while bitCount < 4 {
+            while bitCount < 2 {
                 if byteIndex < bytes.count {
                     let b = bytes[byteIndex]
                     byteIndex += 1
                     bitBuffer = (bitBuffer << 8) | UInt32(b)
                     bitCount += 8
                 } else {
-                    bitBuffer <<= 4
-                    bitCount += 4
+                    bitBuffer <<= 2
+                    bitCount += 2
                 }
             }
-            let shift = bitCount - 4
-            let nibble = UInt8((bitBuffer >> shift) & 0x0F)
-            bitCount -= 4
-            out[i] = nibble
+            let shift = bitCount - 2
+            let twoBits = UInt8((bitBuffer >> shift) & 0x03)
+            bitCount -= 2
+            out[i] = twoBits
         }
         symbols = out
     }
 
     public func color(forSymbol symbol: UInt8) -> Color {
-        let v = Double(symbol & 0x0F) / 15.0
+        let s = Double(symbol & 0x03)
+        let v = s / 3.0
         return Color(white: v)
     }
 

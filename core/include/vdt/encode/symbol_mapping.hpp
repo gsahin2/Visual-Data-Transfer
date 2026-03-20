@@ -32,7 +32,24 @@ struct GridSpec {
   return static_cast<std::uint32_t>(row) * g.cols + col;
 }
 
-/// 16-level symbol id in [0,15] for 4-bit cells (payload packing).
+/// V1 visual channel: **2 bits per cell** → 4 discrete symbol levels (see `docs/constraints.md`).
+[[nodiscard]] constexpr unsigned bits_per_cell_v1() noexcept {
+  return 2;
+}
+
+[[nodiscard]] constexpr unsigned symbol_levels_v1() noexcept {
+  return 4;
+}
+
+[[nodiscard]] constexpr std::uint8_t two_bit_from_symbol_id(std::uint8_t symbol_id) noexcept {
+  return static_cast<std::uint8_t>(symbol_id & 0x03U);
+}
+
+[[nodiscard]] constexpr std::uint8_t symbol_id_from_two_bits(std::uint8_t two_bits) noexcept {
+  return static_cast<std::uint8_t>(two_bits & 0x03U);
+}
+
+/// Legacy 4-bit helpers (tools / experiments); V1 product grid uses 2-bit cells.
 [[nodiscard]] constexpr std::uint8_t nibble_from_symbol_id(std::uint8_t symbol_id) noexcept {
   return static_cast<std::uint8_t>(symbol_id & 0x0FU);
 }

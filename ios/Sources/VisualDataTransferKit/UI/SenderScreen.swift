@@ -3,9 +3,10 @@ import SwiftUI
 public struct SenderScreen: View {
     @State private var text: String = "Hello, VDT"
     @State private var sessionId: UInt32 = 1
+    @State private var encodingMode: VDTEncodingMode = .normal
     @State private var encoded: VDTFramedSession?
 
-    private let grid = VDTLayoutSpec(viewportWidth: 390, viewportHeight: 844, gridRows: 12, gridCols: 16)
+    private let grid = VDTLayoutSpec(viewportWidth: 390, viewportHeight: 844, gridRows: 12, gridCols: 20)
 
     public init() {}
 
@@ -23,9 +24,15 @@ public struct SenderScreen: View {
             ), in: 1...Int(UInt32.max)) {
                 Text("Session ID: \(sessionId)")
             }
-            Button("Encode with core") {
+            Picker("Mode", selection: $encodingMode) {
+                ForEach(VDTEncodingMode.allCases) { m in
+                    Text(m.title).tag(m)
+                }
+            }
+            .pickerStyle(.segmented)
+            Button("Encode loop cycle (core)") {
                 let data = Data(text.utf8)
-                encoded = VDTFramedSession(sessionId: sessionId, message: data)
+                encoded = VDTFramedSession(sessionId: sessionId, message: data, encodingMode: encodingMode)
             }
             .buttonStyle(.borderedProminent)
 

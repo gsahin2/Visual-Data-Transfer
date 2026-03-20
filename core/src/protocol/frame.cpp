@@ -63,14 +63,14 @@ bool parse_header(std::span<const std::uint8_t, kFrameHeaderBytes> in, FrameHead
   out.chunk_index = read_le16(in.data() + 10);
   out.chunk_count = read_le16(in.data() + 12);
   out.payload_length = read_le16(in.data() + 14);
-  if (out.payload_length > kMaxPayloadBytesV1) {
+  if (out.payload_length > kMaxPayloadBytesPerFrame) {
     return false;
   }
   return true;
 }
 
 std::vector<std::uint8_t> build_frame(const FrameHeader& header, std::span<const std::uint8_t> payload) {
-  if (payload.size() > kMaxPayloadBytesV1 || payload.size() != header.payload_length) {
+  if (payload.size() > kMaxPayloadBytesPerFrame || payload.size() != header.payload_length) {
     return {};
   }
   std::vector<std::uint8_t> wire;

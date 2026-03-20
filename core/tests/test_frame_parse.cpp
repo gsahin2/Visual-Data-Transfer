@@ -9,7 +9,7 @@ TEST_CASE("frame header serialization rejects bad magic", "[frame]") {
   std::array<std::uint8_t, vdt::protocol::kFrameHeaderBytes> buf{};
   vdt::protocol::FrameHeader h{};
   h.version = vdt::protocol::kVersion1;
-  h.frame_type = vdt::protocol::FrameType::Data;
+  h.frame_type = vdt::protocol::FrameType::Payload;
   h.session_id = 1;
   h.chunk_index = 0;
   h.chunk_count = 1;
@@ -23,7 +23,7 @@ TEST_CASE("frame header serialization rejects bad magic", "[frame]") {
 TEST_CASE("build and parse frame with payload", "[frame]") {
   vdt::protocol::FrameHeader h{};
   h.version = vdt::protocol::kVersion1;
-  h.frame_type = vdt::protocol::FrameType::Data;
+  h.frame_type = vdt::protocol::FrameType::Payload;
   h.flags = 0;
   h.session_id = 42;
   h.chunk_index = 0;
@@ -42,7 +42,7 @@ TEST_CASE("build and parse frame with payload", "[frame]") {
 TEST_CASE("parse_frame rejects corrupted CRC", "[frame]") {
   vdt::protocol::FrameHeader h{};
   h.version = vdt::protocol::kVersion1;
-  h.frame_type = vdt::protocol::FrameType::Data;
+  h.frame_type = vdt::protocol::FrameType::Payload;
   h.session_id = 7;
   h.chunk_index = 0;
   h.chunk_count = 1;

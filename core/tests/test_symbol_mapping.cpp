@@ -16,3 +16,10 @@ TEST_CASE("nibble symbol helpers", "[symbols]") {
   REQUIRE(vdt::encode::nibble_from_symbol_id(0x1F) == 0x0F);
   REQUIRE(vdt::encode::symbol_id_from_nibble(0x0C) == 0x0C);
 }
+
+TEST_CASE("V1 two-bit symbol helpers", "[symbols]") {
+  REQUIRE(vdt::encode::bits_per_cell_v1() == 2);
+  REQUIRE(vdt::encode::symbol_levels_v1() == 4);
+  REQUIRE(vdt::encode::two_bit_from_symbol_id(0xFF) == 0x03);
+  REQUIRE(vdt::encode::symbol_id_from_two_bits(2) == 2);
+}

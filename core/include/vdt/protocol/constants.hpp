@@ -10,11 +10,18 @@ inline constexpr std::uint8_t kMagic1 = 0x54;  // 'T'
 inline constexpr std::uint8_t kVersion1 = 1;
 
 inline constexpr std::size_t kFrameHeaderBytes = 18;
-inline constexpr std::uint16_t kMaxPayloadBytesV1 = 1024;
+
+/// Maximum bytes in a single frame payload (wire chunk size).
+inline constexpr std::uint16_t kMaxPayloadBytesPerFrame = 1024;
+/// Legacy alias — prefer `kMaxPayloadBytesPerFrame`.
+inline constexpr std::uint16_t kMaxPayloadBytesV1 = kMaxPayloadBytesPerFrame;
+
+/// V1 product target: maximum assembled transfer payload (20 KiB).
+inline constexpr std::uint32_t kMaxTransferPayloadBytes = 20480;
 
 enum class FrameType : std::uint8_t {
-  Data = 0,
-  SessionSync = 1,
+  Payload = 0,     ///< Data chunk of the transfer payload.
+  Descriptor = 1,  ///< Metadata: size, frame count, payload CRC32, encoding mode.
   Reserved = 255,
 };
 

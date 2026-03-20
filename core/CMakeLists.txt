@@ -7,12 +7,15 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_library(vdt_core STATIC
   src/common/crc16.cpp
+  src/common/crc32.cpp
   src/common/bit_packing.cpp
   src/protocol/frame.cpp
   src/protocol/packet.cpp
+  src/protocol/descriptor.cpp
   src/protocol/session.cpp
   src/encode/session_chunker.cpp
   src/encode/frame_encoder.cpp
+  src/encode/transfer_loop.cpp
   src/decode/frame_decoder.cpp
   src/decode/session_assembler.cpp
   src/render/layout.cpp
@@ -41,9 +44,11 @@ if(VDT_BUILD_TESTS)
 
   add_executable(vdt_tests
     tests/test_crc16.cpp
+    tests/test_crc32.cpp
     tests/test_encode_decode.cpp
     tests/test_frame_parse.cpp
     tests/test_symbol_mapping.cpp
+    tests/test_transfer_loop.cpp
   )
   target_link_libraries(vdt_tests PRIVATE vdt_core Catch2::Catch2WithMain)
   target_include_directories(vdt_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")

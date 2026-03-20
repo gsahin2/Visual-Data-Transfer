@@ -1,45 +1,90 @@
-# Protocol V1
+# Protocol V1 (20 KiB transfer target)
 
-Version 1 defines a compact binary frame for screen-to-camera transmission experiments. Integrity uses **CRC-16/CCITT-FALSE** (poly `0x1021`, init `0xFFFF`, no reflection).
+V1 supports **loop-based** optical transfer: the sender repeats a structured sequence so a receiver can recover up to **20,480 bytes** over several seconds. Authoritative constants live in `core/include/vdt/protocol/constants.hpp`.
 
-## Frame format
+## Transfer session model
 
-All multi-byte fields are **little-endian**.
+| Concept | Description |
+|---------|-------------|
+| **Transfer ID** | `session_id` in the frame header (32-bit); identifies one logical transfer. |
+| **Payload size** | Total application bytes (≤ `kMaxTransferPayloadBytes` = 20 KiB). |
+| **Data frames** | `FrameType::Payload` chunks carrying sequential payload segments. |
+| **Descriptor frames** | `FrameType::Descriptor` — repeat metadata so late-joining receivers can sync. |
+| **Encoding mode** | `Safe` (high descriptor redundancy) vs `Normal` (balanced); stored in descriptor body. |
+| **Per-frame integrity** | **CRC-16/CCITT-FALSE** over `header || payload`. |
+| **End-to-end integrity** | **CRC-32 (IEEE / Ethernet)** over the **full assembled payload**, stored in the descriptor. |
+
+### Descriptor payload (`TransferDescriptorV1`, 20 bytes LE)
+
+| Offset | Size | Field |
+|--------|------|--------|
+| 0 | 1 | `layout_version` (= 1) |
+| 1 | 1 | `encoding_mode` (0 Safe, 1 Normal) |
+| 2 | 2 | `reserved0` (0) |
+| 4 | 4 | `transfer_id` |
+| 8 | 4 | `payload_byte_length` |
+| 12 | 4 | `payload_crc32` |
+| 16 | 2 | `data_frame_count` (number of Payload frames in one cycle) |
+| 18 | 2 | `reserved1` (0) |
+
+Descriptor frames use the same outer header as payload frames: `chunk_index = 0`, `chunk_count = 1`, `frame_type = Descriptor`.
+
+## Frame envelope (unchanged octet layout)
 
 | Field | Size | Description |
 |-------|------|-------------|
 | `magic0` | 1 | `0x56` (`V`) |
 | `magic1` | 1 | `0x54` (`T`) |
-| `version` | 1 | Must be `1` |
-| `frame_type` | 1 | `0` data, `1` session sync (extensible) |
-| `flags` | 1 | Bit `0`: final-chunk hint |
+| `version` | 1 | `1` |
+| `frame_type` | 1 | `0` Payload, `1` Descriptor |
+| `flags` | 1 | Bit 0: final-chunk hint (payload path) |
 | `reserved` | 1 | `0` |
-| `session_id` | 4 | Logical session identifier |
-| `chunk_index` | 2 | Zero-based chunk index |
-| `chunk_count` | 2 | Total chunks in the session |
-| `payload_length` | 2 | Length of payload in bytes |
-| `padding` | 2 | Zeroed (alignment) |
-| `payload` | `payload_length` | Opaque bytes |
-| `crc16` | 2 | CRC over **header + payload** (excluding the CRC itself) |
+| `session_id` | 4 | Transfer ID |
+| `chunk_index` | 2 | Zero-based payload chunk index (descriptors use `0`) |
+| `chunk_count` | 2 | Total payload chunks in session (descriptors use `1`) |
+| `payload_length` | 2 | Bytes following header |
+| `padding` | 2 | `0` |
+| `payload` | `payload_length` | Descriptor body or raw chunk bytes |
+| `crc16` | 2 | CRC16 over header + payload |
 
-`HEADER_BYTES = 18`. Maximum `payload_length` is `1024` (`kMaxPayloadBytesV1`).
+`kFrameHeaderBytes = 18`. **`payload_length` ≤ `kMaxPayloadBytesPerFrame` (1024).**
 
-## Session rules
+## Loop strategy (sender)
 
-- `chunk_count` must be consistent for every frame in a session.
-- Chunks are **ordered** by `chunk_index` and concatenated without inserting separators.
-- Duplicate indices are rejected by the assembler.
+One **loop cycle** is built by `vdt::encode::build_transfer_loop_cycle` (and `vdt_transfer_loop_cycle` in the C API):
+
+| Mode | Order within a cycle |
+|------|----------------------|
+| **Normal** | `[Descriptor] [Payload₀ … Payloadₙ₋₁]` |
+| **Safe** | `[Descriptor][Payload₀][Descriptor][Payload₁]…` |
+
+The UI / scheduler **repeats** this cycle for the target wall-clock duration (Phase 2). Decoders treat repeated identical chunk indices as **redundant** (same bytes → success; conflicting bytes → error).
+
+## Receiver assembly
+
+1. Parse **Descriptor** whenever seen; refresh `SessionReassemblyBuffer` with `data_frame_count`.
+2. Ingest **Payload** frames in any order **by chunk index** until all slots filled.
+3. When a descriptor was processed, `SessionAssembler::take_merged_payload` checks **byte length** and **CRC-32** before returning data.
+4. If no descriptor was seen (legacy path), assembly uses header `chunk_count` only and **skips** CRC32 verification at take time.
+
+## Symbol mapping (visual channel)
+
+The **on-screen grid** is separate from the wire chunking. V1 product default: **2 bits per cell** (4 luminance levels). See `docs/frame-layout.md` and `docs/constraints.md`.
+
+## Bit packing
+
+MSB-first bit streams for dense packing live in `vdt::common::BitWriter` / `BitReader`.
 
 ## Optional inner packet layout
 
-`protocol/packet.hpp` defines an optional logical layout for payloads:
+`protocol/packet.hpp` still defines an optional `stream_offset` / `stream_total` wrapper for future streaming APIs; the reference loop encoder uses **raw payload chunks** in Payload frames.
 
-```
-| stream_offset: u64 | stream_total: u64 | message... |
-```
+## Reference code
 
-The reference encoder currently emits **raw chunk bytes** with metadata carried only in the frame header. The packet helpers exist for higher-level streaming without changing the wire envelope.
-
-## Constants (C++)
-
-See `core/include/vdt/protocol/constants.hpp` for authoritative values.
+| Area | Location |
+|------|-----------|
+| Constants | `core/include/vdt/protocol/constants.hpp` |
+| Descriptor | `core/include/vdt/protocol/descriptor.hpp` |
+| Loop cycle | `core/include/vdt/encode/transfer_loop.hpp` |
+| Assembler | `core/include/vdt/decode/session_assembler.hpp` |
+| C API | `core/include/vdt/capi.h` |

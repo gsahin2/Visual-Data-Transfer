@@ -11,6 +11,12 @@ extern "C" {
 /// CRC-16/CCITT-FALSE over the given bytes.
 uint16_t vdt_crc16(const uint8_t* data, size_t length);
 
+/// CRC-32 (IEEE / Ethernet) over the given bytes.
+uint32_t vdt_crc32_ieee(const uint8_t* data, size_t length);
+
+/// Maximum assembled transfer payload for V1 (20 KiB).
+uint32_t vdt_max_transfer_payload_bytes(void);
+
 typedef struct VDTFrameHeaderC {
   uint8_t version;
   uint8_t frame_type;
@@ -40,6 +46,10 @@ VDTEncodedSession* vdt_encode_session(uint32_t session_id, const uint8_t* messag
                                       uint16_t max_payload_bytes);
 
 void vdt_encoded_session_free(VDTEncodedSession* session);
+
+/// Builds one full loop cycle (descriptor + payload frames). `encoding_mode`: 0 = Safe, 1 = Normal.
+VDTEncodedSession* vdt_transfer_loop_cycle(uint32_t transfer_id, const uint8_t* message, size_t message_length,
+                                           uint8_t encoding_mode, uint16_t max_payload_bytes);
 
 /// Pixel-space cell rectangle for a row-major grid inside the viewport.
 void vdt_layout_cell_rect(uint32_t viewport_width, uint32_t viewport_height, uint16_t grid_rows, uint16_t grid_cols,

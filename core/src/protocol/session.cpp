@@ -1,5 +1,7 @@
 #include "vdt/protocol/session.hpp"
 
+#include <algorithm>
+
 namespace vdt::protocol {
 
 void SessionReassemblyBuffer::reset(const SessionDescriptor& desc) {
@@ -13,7 +15,9 @@ bool SessionReassemblyBuffer::ingest_chunk(std::uint16_t index, ByteBuffer paylo
     return false;
   }
   if (slots_[index].has_value()) {
-    return false;
+    const auto& existing = *slots_[index];
+    return existing.size() == payload.size() &&
+           std::equal(existing.begin(), existing.end(), payload.begin(), payload.end());
   }
   slots_[index] = std::move(payload);
   ++filled_;

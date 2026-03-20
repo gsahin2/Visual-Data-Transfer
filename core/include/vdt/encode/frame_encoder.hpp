@@ -18,14 +18,14 @@ struct EncodedFrame {
 /// Builds wire frames for a session from a single logical payload (chunked automatically).
 class FrameEncoder {
  public:
-  explicit FrameEncoder(std::uint16_t max_payload_bytes = protocol::kMaxPayloadBytesV1);
+  explicit FrameEncoder(std::uint16_t max_payload_bytes = protocol::kMaxPayloadBytesPerFrame);
 
   [[nodiscard]] std::vector<EncodedFrame> encode_session(std::uint32_t session_id,
                                                          std::span<const std::uint8_t> message,
-                                                         protocol::FrameType type = protocol::FrameType::Data);
+                                                         protocol::FrameType type = protocol::FrameType::Payload);
 
  private:
-  std::uint16_t max_payload_{protocol::kMaxPayloadBytesV1};
+  std::uint16_t max_payload_{protocol::kMaxPayloadBytesPerFrame};
 };
 
 }  // namespace vdt::encode

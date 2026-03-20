@@ -59,12 +59,12 @@ The project is divided into three main layers:
 
 ## Features (V1)
 
-- Symbol-grid based transmission
-- Frame-based protocol (chunked payload)
-- CRC16 integrity validation
-- Session-based reconstruction
-- Deterministic rendering layout
-- Recorded-video decoding (first target)
+- **20 KiB** max assembled payload (`kMaxTransferPayloadBytes`)
+- Loop-friendly framing: **descriptor** + **payload** frames (`build_transfer_loop_cycle`, Safe / Normal)
+- **CRC-16** per wire frame; **CRC-32 (IEEE)** over full payload (descriptor + verify on assemble)
+- Symbol grid: **2 bits/cell** (4 levels) for the visual channel
+- Session assembly with **duplicate chunk** tolerance (loop redundancy)
+- Deterministic layout; recorded-video decode path (tools)
 
 ---
 
@@ -85,3 +85,14 @@ ios/         → Swift demo + SDK
 python/      → tools & experiments
 docs/        → specifications
 samples/     → test assets
+```
+
+---
+
+## Build & documentation
+
+- **C++:** `cmake -S core -B build-core && cmake --build build-core && ctest --test-dir build-core`
+- **Swift:** `swift build` (root `Package.swift`)
+- **Docs:** [Architecture](docs/architecture.md) · [Protocol V1](docs/protocol-v1.md) · [Frame layout](docs/frame-layout.md) · [Constraints](docs/constraints.md) · [Performance baseline](docs/performance-baseline.md) · [Roadmap](docs/roadmap.md) · [Contributing](CONTRIBUTING.md)
+
+**License:** [LICENSE](LICENSE) (Apache-2.0)

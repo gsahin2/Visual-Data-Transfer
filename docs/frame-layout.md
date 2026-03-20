@@ -5,8 +5,8 @@ The **visual grid** is independent from the binary wire format but is designed t
 ## Grid parameters
 
 - `rows` × `cols` cells, **row-major** linear indexing.
-- Each cell represents **4 bits** (16 discrete levels) in demo renderers.
-- Bytes are expanded MSB-first within each byte; cells consume nibbles in order.
+- **V1:** each cell represents **2 bits** (**4** discrete luminance levels). Legacy tooling may still use 4-bit experiments.
+- Bytes are expanded **MSB-first** within each byte; cells consume **bit pairs** in order.
 
 ## Mapping helpers (C++)
 

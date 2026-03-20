@@ -21,9 +21,9 @@ Visual Data Transfer separates **protocol and vision mathematics** from **platfo
 
 ## Data flow (sender)
 
-1. Application payload (bytes) enters the **encoder**, which chunks according to `kMaxPayloadBytesV1`.
+1. Application payload (bytes) enters the **encoder**, which chunks according to `kMaxPayloadBytesPerFrame` (1024 B) until the full message (≤ **20 KiB**, `kMaxTransferPayloadBytes`) is covered. A **loop cycle** prepends descriptor frame(s) per `EncodingMode` (`build_transfer_loop_cycle`).
 2. Each chunk becomes a **wire frame**: fixed header + payload + CRC16 over header+payload.
-3. Swift **renders** the *visual* channel (grid of symbols) deterministically from the same payload bytes (independent bitstream layout from the wire format, but stable for demos).
+3. Swift **renders** the *visual* channel (grid of symbols, **2 bits/cell** in V1) deterministically from the same payload bytes (orthogonal to wire chunking; see `docs/constraints.md`).
 
 ## Data flow (receiver)
 

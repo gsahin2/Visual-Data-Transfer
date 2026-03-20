@@ -9,6 +9,9 @@ FrameEncoder::FrameEncoder(std::uint16_t max_payload_bytes) : max_payload_(max_p
 std::vector<EncodedFrame> FrameEncoder::encode_session(const std::uint32_t session_id,
                                                        const std::span<const std::uint8_t> message,
                                                        const protocol::FrameType type) {
+  if (message.size() > protocol::kMaxTransferPayloadBytes) {
+    return {};
+  }
   const auto chunks = split_payload(message, max_payload_);
   std::vector<EncodedFrame> out;
   if (chunks.empty()) {

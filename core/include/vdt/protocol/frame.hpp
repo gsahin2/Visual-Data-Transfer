@@ -11,7 +11,7 @@ namespace vdt::protocol {
 
 struct FrameHeader {
   std::uint8_t version{kVersion1};
-  FrameType frame_type{FrameType::Data};
+  FrameType frame_type{FrameType::Payload};
   std::uint8_t flags{0};
   std::uint8_t reserved{0};
   std::uint32_t session_id{0};
