@@ -39,11 +39,15 @@ swift build
 
 ```bash
 cd python && pip install -r requirements.txt
+# Optional: opencv-python-headless — enables quad homography test in test_optical_e2e.py
 python3 generate_test_frames.py --out-dir ../samples/generated
 python3 -m unittest discover -v -p 'test_*.py'
 ```
 
-Protocol / assembler smoke tests live in `python/test_vdt_protocol_v1.py` (stdlib `unittest` only; no pytest required).
+- `python/test_vdt_protocol_v1.py` — protocol / assembler (stdlib `unittest` only; no pytest required).
+- `python/test_optical_e2e.py` — synthetic 20 KiB optical roundtrip (PNG grid); quad vs full-bleed test skipped without OpenCV.
+- `python/benchmark_phase0.py` — synthetic Phase 0 timings (JSON); see `docs/performance-baseline.md`.
+- `python/build_synthetic_optical_video.py` — build a short MP4 of wire grids for `--decode-grid` / `--assemble-grid` demos.
 
 ## Pull requests
 

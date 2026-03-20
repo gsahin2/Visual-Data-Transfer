@@ -2,6 +2,8 @@
 
 This is the working checklist for **Visual Data Transfer V1** (20 KiB target). It complements [`roadmap.md`](roadmap.md) with finer tasks and **done / not done** markers as of the current repository.
 
+**Scope:** Rows under **Phases 0–6** are **engineering deliverables** (code, tools, docs). The **V1 completion criteria** block at the top is a separate **product / validation** gate (optical E2E, measured success rate, device matrix)—those can stay open until you run hardware trials.
+
 **Legend:** `[x]` implemented or documented in-repo · `[~]` partial / scaffold only · `[ ]` not started
 
 ---
@@ -10,7 +12,8 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 
 | Task | Status |
 |------|--------|
-| 20 KiB payload transferred end-to-end (optical path) | [ ] |
+| 20 KiB payload transferred end-to-end (optical path, **field** / camera) | [ ] |
+| 20 KiB payload end-to-end (**synthetic**: PNG grid + Python decode + assemble) | [x] — `python/test_optical_e2e.py`, `encode_session_wires` + `render_wire_as_grid_png_rgb` |
 | ≤ ~20 s average completion (Normal, nominal setup) | [ ] |
 | ≥ 95% success in defined “normal” conditions | [ ] |
 | ≥ 2 device models validated | [ ] |
@@ -27,7 +30,7 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 | Document payload cap (20 KiB), timing budget, success metrics | [x] — [`constraints.md`](constraints.md) |
 | Document grids 12×20, 16×24; 2-bit cells; Safe / Normal | [x] |
 | `performance-baseline.md` template (throughput table, error categories) | [x] |
-| **Filled-in** benchmark numbers (measured bits/s, real throughput) | [ ] |
+| **Filled-in** benchmark numbers (measured bits/s, real throughput) | [~] — synthetic CPU sample in [`performance-baseline.md`](performance-baseline.md) via `python/benchmark_phase0.py`; **field** throughput rows still empty |
 | **Filled-in** decoding error pattern notes from hardware tests | [ ] |
 
 ---
@@ -85,16 +88,16 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 | Synthetic **PNG** grid → bytes (optical round-trip) | [x] — `grid_decode_image.py` |
 | OpenCV: extract frames from video | [x] — `decode_recorded_video.py` |
 | From **video frames**: full-bleed grid sample + 2-bit → bytes | [x] — `--decode-grid` + `grid_codec.py` (no homography) |
-| From **video frames**: markers, homography, crop | [ ] |
-| From **video frames**: classify → **wire** `parse_frame` / chunk assembly | [~] — `--assemble-grid`: `parse_frame` → `SessionAssembler.push_decoded` (needs **full** VT wire in grid decode; typical sender payload grid is too short per frame) |
+| From **video frames**: markers, homography, crop | [x] — `--grid-sample quad` + `--quad` (TL,TR,BR,BL); `grid_codec.grid_symbols_quad_from_ndarray_bgr` (requires **opencv-python**); margin / full-bleed remain default |
+| From **video frames**: classify → **wire** `parse_frame` / chunk assembly | [x] — `--assemble-grid`: `parse_frame` → `SessionAssembler.push_decoded`; **full VT wire** must fit in decoded grid bytes per frame (synthetic optical tests use chunked `encode_session_wires`; typical **payload-only** sender grids still need a larger grid or full-wire mode for full E2E) |
 | Timestamp / frame-skip policy for video | [~] — `--frame-stride` |
 | Dump grid-decoded blobs to disk | [x] — `--write-decoded DIR` |
 | Dump **merged** payloads from grid assembly | [x] — `--write-assembled DIR` (with `--assemble-grid`) |
 | Optional `parse_frame` on grid output (debug) | [x] — `--try-parse-wire` |
-| Debug overlays, missing-frame stats, logging | [~] — `--decode-grid` prints **read vs decoded** counts, stride skips, stop reason (`eof` / `max_frames`); with `--try-parse-wire`: magic prefix / short / parse_ok / parse_fail; **`--quiet`** skips per-frame lines; **`--wire-dir`** summary: push_ok / push_fail |
-| End-to-end: **video file → full payload** (optical) | [ ] |
+| Debug overlays, missing-frame stats, logging | [x] — per-frame stats as before; **`--summary-json`** writes capped decode stats + `CAP_PROP_POS_MSEC` samples |
+| End-to-end: **video file → full payload** (optical) | [ ] — use `build_synthetic_optical_video.py` + `decode_recorded_video.py --assemble-grid` for a **synthetic** MP4 check; real-camera capture still TBD |
 
-**Note:** C++ vision is wired on **iOS** via `vdt_sample_grid_full_bleed` (`VDTFullBleedGridSampler`). The **Python** video path still uses Swift/Python margin/gap sampling only (no homography in `decode_recorded_video.py` yet).
+**Note:** C++ vision on **iOS** uses `vdt_sample_grid_full_bleed` (`VDTFullBleedGridSampler`). **Python** video decode supports **margin**, **full-bleed**, and **quad** homography sampling (`decode_recorded_video.py` / `grid_codec.decode_grid_from_ndarray_bgr_mode`).
 
 ---
 
@@ -110,7 +113,7 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 | If luma decodes to raw **VT** wire, show parse in status | [x] — magic `0x56 0x54` + `VDTWireFrameParser` |
 | **`VDTSessionReassembler`** (core assembler via C API) | [x] — when a **full** wire frame parses; normal sender grid is **payload-only** (~60 B/cell budget), so E2E optical assembly needs larger grid or full-wire mode later |
 | Wire C++ `GridSampler` / homography in app | [x] — `vdt_sample_grid_full_bleed` (`FullBleedMarkerDetector` → normalized quad → `GridSampler`); Swift `VDTFullBleedGridSampler`; Receiver toggle **C++ full-bleed grid** |
-| Session state machine (detect transfer, progress, complete) | [x] — `ReceiverPhase` + `phaseLabel`: idle → listening → decoded raw → wire → assembling → complete / rejected |
+| Session state machine (detect transfer, progress, complete) | [x] — `VDTReceiverRunPhase` + `phaseLabel`: idle → listening → decoded raw → wire → assembling → complete / rejected (`ReceiverController`) |
 | Progress UI, errors / retry hints | [x] — phase caption + luma line + **RX:** auxiliary (sticky last payload); reject line suggests retry / alignment |
 | Duplicate / confidence / adaptive thresholding | [x] — `TemporalSymbolMajority` (3-frame per-cell vote); optional **adaptive** min–max quartile thresholds in `LumaGridDecoder`; chunk/session consistency still enforced in core assembler |
 
@@ -148,7 +151,7 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 | Tests | `core/tests/`, CMake + Catch2 |
 | Swift kit + demo | `ios/Sources/`, `ios/Demo/`, root `Package.swift`; public API under `API/`, `ProductTransferExperience`, [`docs/sdk-packaging.md`](sdk-packaging.md) |
 | Swift luma grid decode | `ios/Sources/VisualDataTransferKit/Vision/LumaGridDecoder.swift` |
-| Python tools | `python/` (`unittest`: `test_vdt_protocol_v1.py`) |
+| Python tools | `python/` (`unittest`: `test_vdt_protocol_v1.py`, `test_optical_e2e.py`; optional **opencv-python** for quad homography test) |
 | Specs & constraints | `docs/` |
 
 ---

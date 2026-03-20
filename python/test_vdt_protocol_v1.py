@@ -16,6 +16,7 @@ from vdt_protocol_v1 import (
     TransferDescriptorV1,
     build_frame,
     crc32_ieee,
+    encode_session_wires,
     parse_frame,
 )
 
@@ -137,6 +138,23 @@ class TestSessionAssemblerPushDecoded(unittest.TestCase):
         self.assertTrue(asm.push_decoded(h_p1, b))
         self.assertTrue(asm.is_complete())
         self.assertEqual(asm.take_payload(), msg)
+
+
+class TestEncodeSessionWires(unittest.TestCase):
+    def test_chunked_assemble_matches_message(self) -> None:
+        msg = b"chunked-payload-" * 80
+        wires = encode_session_wires(7, msg, max_payload_per_chunk=100)
+        asm = SessionAssembler()
+        for wire in wires:
+            self.assertTrue(asm.push_wire(wire))
+        self.assertEqual(asm.take_payload(), msg)
+
+    def test_parse_each_wire(self) -> None:
+        msg = b"hi"
+        wires = encode_session_wires(1, msg, max_payload_per_chunk=1024)
+        self.assertGreaterEqual(len(wires), 2)
+        for wire in wires:
+            self.assertIsNotNone(parse_frame(wire))
 
 
 class TestMajoritySymbols(unittest.TestCase):

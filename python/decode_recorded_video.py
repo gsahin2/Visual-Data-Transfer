@@ -7,6 +7,7 @@ With `--assemble-grid`, each successful `parse_frame` is passed to `SessionAssem
 from __future__ import annotations
 
 import argparse
+import json
 from collections import Counter, deque
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -23,7 +24,10 @@ else:
 
 from grid_codec import (
     bitstream_to_bytes,
+    decode_grid_from_ndarray_bgr_mode,
     grid_symbols_from_ndarray_bgr,
+    grid_symbols_full_bleed_from_ndarray_bgr,
+    grid_symbols_quad_from_ndarray_bgr,
     majority_symbols,
     symbols_to_bitstream,
 )
@@ -31,8 +35,15 @@ from vdt_protocol_v1 import FRAME_DESCRIPTOR, FRAME_PAYLOAD, SessionAssembler, p
 
 
 def scan_frame_buffer(gray: np.ndarray) -> Optional[bytes]:
-    """Placeholder: homography + grid sampling would produce wire bytes here."""
-    _ = gray
+    """Try margin-layout grid decode + ``parse_frame`` (legacy video scan path)."""
+    if cv2 is None:
+        return None
+    bgr = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+    blob = decode_grid_from_ndarray_bgr_mode(bgr, 12, 20, 8, 2, None, False, "margin", None)
+    if len(blob) < 20:
+        return None
+    if parse_frame(blob):
+        return blob
     return None
 
 
@@ -85,6 +96,18 @@ def scan_video(path: Path, max_frames: int) -> None:
     print(f"Scanned {max_frames} frames, structured hits: {found}")
 
 
+def _parse_quad_corners(s: str) -> List[Tuple[float, float]]:
+    parts = [float(x.strip()) for x in s.split(",")]
+    if len(parts) != 8:
+        raise ValueError("expected 8 comma-separated numbers: x0,y0,…,x3,y3 (TL,TR,BR,BL)")
+    return [
+        (parts[0], parts[1]),
+        (parts[2], parts[3]),
+        (parts[4], parts[5]),
+        (parts[6], parts[7]),
+    ]
+
+
 def _wire_line(parsed) -> str:
     hdr, payload = parsed
     if hdr.frame_type == FRAME_DESCRIPTOR:
@@ -113,6 +136,9 @@ def decode_video_grid(
     quiet: bool,
     vote_frames: int,
     adaptive_cells: bool,
+    grid_sample_mode: str = "margin",
+    quad_tl_tr_br_bl: Optional[List[Tuple[float, float]]] = None,
+    summary_json: Optional[Path] = None,
 ) -> None:
     if cv2 is None:
         raise SystemExit(f"OpenCV is required: {_cv_import_error}")
@@ -137,6 +163,7 @@ def decode_video_grid(
     last_grid_frame_index = -1
     vf = max(1, vote_frames)
     sym_history: deque[List[int]] = deque(maxlen=vf)
+    frame_timestamps_ms: List[Tuple[int, float]] = []
 
     def save_assembled_payload(merged: bytes, frame_idx: int) -> None:
         nonlocal assembled_seq
@@ -158,7 +185,19 @@ def decode_video_grid(
         if resize_wh is not None:
             rw, rh = resize_wh
             frame = cv2.resize(frame, (rw, rh), interpolation=cv2.INTER_AREA)
-        syms = grid_symbols_from_ndarray_bgr(frame, rows, cols, margin, gap, adaptive_cells)
+        t_msec = float(cap.get(cv2.CAP_PROP_POS_MSEC))
+        frame_timestamps_ms.append((i, t_msec))
+        sm = grid_sample_mode.lower()
+        if sm == "margin":
+            syms = grid_symbols_from_ndarray_bgr(frame, rows, cols, margin, gap, adaptive_cells)
+        elif sm == "fullbleed":
+            syms = grid_symbols_full_bleed_from_ndarray_bgr(frame, rows, cols, adaptive_cells)
+        elif sm == "quad":
+            if quad_tl_tr_br_bl is None:
+                raise SystemExit("--grid-sample quad requires --quad TL,TR,BR,BL coordinates")
+            syms = grid_symbols_quad_from_ndarray_bgr(frame, rows, cols, quad_tl_tr_br_bl, adaptive_cells)
+        else:
+            raise SystemExit(f"unknown --grid-sample {grid_sample_mode!r}")
         sym_history.append(syms)
         voted = majority_symbols(list(sym_history)) if vf > 1 else syms
         blob = bitstream_to_bytes(symbols_to_bitstream(voted), max_bytes=byte_length)
@@ -248,18 +287,56 @@ def decode_video_grid(
         )
         if asm_push_ok == 0:
             print("assembly: no valid wire frames were pushed (grid blobs are not full VT wire?)")
-        elif not asm.is_complete() and not eof_drained_ok:
+        elif (
+            not asm.is_complete()
+            and not eof_drained_ok
+            and asm_sessions_ok == 0
+        ):
             print("assembly: incomplete at EOF (partial session; need more frames or full-wire grid)")
         if write_assembled is not None and assembled_seq > 0:
             print(f"assembly: wrote {assembled_seq} payload file(s) → {write_assembled}")
+    ctr = Counter(decoded)
     if not decoded:
         print("No grid decodes accumulated.")
-        return
-    ctr = Counter(decoded)
-    most_common = ctr.most_common(3)
-    print(f"Unique decodes: {len(ctr)}  (top {len(most_common)} by count)")
-    for blob, count in most_common:
-        print(f"  x{count}: {blob[:48]!r}{'...' if len(blob) > 48 else ''}")
+    else:
+        most_common = ctr.most_common(3)
+        print(f"Unique decodes: {len(ctr)}  (top {len(most_common)} by count)")
+        for blob, count in most_common:
+            print(f"  x{count}: {blob[:48]!r}{'...' if len(blob) > 48 else ''}")
+
+    summary: dict = {
+        "video_path": str(path),
+        "frames_read": frames_read,
+        "frames_decoded": processed,
+        "skipped_by_stride": max(0, frames_read - processed),
+        "stop_reason": stop_reason,
+        "frame_stride": stride,
+        "grid_sample_mode": grid_sample_mode,
+        "vote_frames": vf,
+        "adaptive_cells": adaptive_cells,
+        "unique_decode_blobs": len(ctr),
+        "frame_timestamps_ms": frame_timestamps_ms[:200],
+    }
+    if try_parse_wire:
+        summary["wire_parse"] = {
+            "magic_0x5654_prefix": magic_prefix,
+            "too_short_lt20": parse_short,
+            "parse_ok": parse_ok,
+            "parse_fail": parse_fail,
+        }
+    if assemble_grid and asm is not None:
+        summary["assembly"] = {
+            "push_ok": asm_push_ok,
+            "push_fail": asm_push_fail,
+            "sessions_ok": asm_sessions_ok,
+            "crc_or_size_reject": asm_sessions_crc_fail,
+            "complete_at_eof": asm.is_complete(),
+        }
+    if summary_json is not None:
+        summary_json.parent.mkdir(parents=True, exist_ok=True)
+        summary_json.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+        if not quiet:
+            print(f"summary-json: {summary_json}")
 
 
 def main() -> None:
@@ -269,7 +346,7 @@ def main() -> None:
     parser.add_argument(
         "--decode-grid",
         action="store_true",
-        help="Decode 2-bit grid from each video frame (full-bleed, no homography)",
+        help="Decode 2-bit grid from each video frame (see --grid-sample)",
     )
     parser.add_argument("--max-frames", type=int, default=200, help="Max frames to process (grid or scan)")
     parser.add_argument("--frame-stride", type=int, default=1, help="Use every Nth frame for --decode-grid")
@@ -322,6 +399,24 @@ def main() -> None:
         action="store_true",
         help="With --decode-grid: min–max quartile thresholds per frame (low-light contrast stretch)",
     )
+    parser.add_argument(
+        "--grid-sample",
+        choices=["margin", "fullbleed", "quad"],
+        default="margin",
+        help="Video frame sampling: margin/gap (sender layout), full-bleed bilinear, or quad homography",
+    )
+    parser.add_argument(
+        "--quad",
+        type=str,
+        default=None,
+        help="With --grid-sample quad: TL,TR,BR,BL as x0,y0,x1,y1,x2,y2,x3,y3 (pixels)",
+    )
+    parser.add_argument(
+        "--summary-json",
+        type=Path,
+        default=None,
+        help="Write decode statistics + frame timestamps (CAP_PROP_POS_MSEC) to this JSON file",
+    )
     args = parser.parse_args()
 
     resize_wh: Optional[Tuple[int, int]] = None
@@ -339,6 +434,14 @@ def main() -> None:
             parser.error("--decode-grid requires a video path")
         if args.write_assembled is not None and not args.assemble_grid:
             parser.error("--write-assembled requires --assemble-grid")
+        quad_pts: Optional[List[Tuple[float, float]]] = None
+        if args.grid_sample == "quad":
+            if not args.quad:
+                parser.error("--grid-sample quad requires --quad")
+            try:
+                quad_pts = _parse_quad_corners(args.quad)
+            except ValueError as exc:
+                parser.error(str(exc))
         decode_video_grid(
             args.video,
             args.max_frames,
@@ -356,6 +459,9 @@ def main() -> None:
             args.quiet,
             args.vote_frames,
             args.adaptive_cells,
+            args.grid_sample,
+            quad_pts,
+            args.summary_json,
         )
     elif args.video is not None:
         scan_video(args.video, args.max_frames)

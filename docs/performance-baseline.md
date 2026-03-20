@@ -14,7 +14,25 @@ Use this file to record **measured** numbers. Targets live in `constraints.md`.
      `raw_visual_bits_per_frame = rows × cols × 2`  
    - **Effective bytes/frame (visual)** = `raw_visual_bits_per_frame / 8`.
 
-3. **End-to-end**  
+3. **Synthetic Phase 0 timings (Python, developer machine)**  
+   Run from `python/`: `python3 benchmark_phase0.py` (prints JSON). Example capture (re-run on your hardware):
+
+   ```json
+   {
+     "tool": "benchmark_phase0.py",
+     "symbol_expand_iters": 200,
+     "symbol_expand_total_s": 0.02027,
+     "symbol_expand_per_iter_us": 101.35,
+     "grid_decode_png_iters": 200,
+     "grid_decode_total_s": 0.163105,
+     "grid_decode_per_iter_us": 815.53,
+     "note": "Synthetic CPU timings on developer machine; re-run for your hardware."
+   }
+   ```
+
+   This is **not** optical throughput; it sanity-checks symbol expansion + PNG grid decode cost offline.
+
+4. **End-to-end (field / camera)**  
    - Record: distance, lighting (lux estimate or label), device models, mode (Safe/Normal), time-to-100%-payload, and whether CRC32 matched.
 
 ## Theoretical capacity (reference)
@@ -66,3 +84,4 @@ Use these when filling the throughput worksheet above; numbers are **design inte
 |------|--------|--------|
 | — | — | Template created |
 | 2025-03-20 | — | Phase 5 reference table + measurement reminder |
+| 2026-03-20 | — | Synthetic `benchmark_phase0.py` sample JSON in “How to benchmark” |

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import struct
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 MAGIC0 = 0x56
 MAGIC1 = 0x54
@@ -87,8 +87,11 @@ def parse_frame(wire: bytes) -> Optional[Tuple[FrameHeader, bytes]]:
     if payload_length > MAX_PAYLOAD_PER_FRAME:
         return None
     expected = HEADER_BYTES + payload_length + 2
-    if len(wire) != expected:
+    if len(wire) < expected:
         return None
+    # Grid / optical paths often yield a fixed cell bit capacity with zero-padded tail;
+    # only the first ``expected`` bytes participate in the frame.
+    wire = wire[:expected]
     stored = struct.unpack_from("<H", wire, HEADER_BYTES + payload_length)[0]
     computed = crc16_ccitt_false(wire[: HEADER_BYTES + payload_length])
     if stored != computed:
@@ -140,6 +143,41 @@ class TransferDescriptorV1:
         if lv != 1 or dfc == 0 or plen > MAX_TRANSFER_PAYLOAD:
             return None
         return TransferDescriptorV1(lv, em, r0, tid, plen, pcrc, dfc, r1)
+
+
+def encode_session_wires(
+    transfer_id: int,
+    message: bytes,
+    *,
+    max_payload_per_chunk: int = MAX_PAYLOAD_PER_FRAME,
+) -> List[bytes]:
+    """
+    Build one descriptor frame plus payload chunk wires (same chunking rules as the C++ encoder).
+
+    Use a smaller ``max_payload_per_chunk`` when each wire must fit in a fixed grid
+    (see ``optical_wire.max_optical_payload_bytes``).
+    """
+    if len(message) > MAX_TRANSFER_PAYLOAD:
+        raise ValueError("message exceeds V1 max transfer size")
+    tid = transfer_id & 0xFFFFFFFF
+    mx = max(1, min(MAX_PAYLOAD_PER_FRAME, max_payload_per_chunk))
+    chunks = [message[i : i + mx] for i in range(0, len(message), mx)]
+    n = len(chunks)
+    crc_full = crc32_ieee(message) & 0xFFFFFFFF
+    desc = TransferDescriptorV1(
+        transfer_id=tid,
+        payload_byte_length=len(message),
+        payload_crc32=crc_full,
+        data_frame_count=n,
+        encoding_mode=1,
+    )
+    desc_body = desc.serialize()
+    dh = FrameHeader(VERSION1, FRAME_DESCRIPTOR, 0, tid, 0, 1, len(desc_body))
+    out: List[bytes] = [build_frame(dh, desc_body)]
+    for idx, chunk in enumerate(chunks):
+        ph = FrameHeader(VERSION1, FRAME_PAYLOAD, 0, tid, idx, n, len(chunk))
+        out.append(build_frame(ph, chunk))
+    return out
 
 
 class SessionAssembler:
