@@ -4,7 +4,7 @@
 
 - **C bridge** — wraps `vdt_*` functions from `VDTCoreC` (built from `core/` sources).
 - **Sender** — `SenderScreen` builds a loop cycle via `VDTFramedSession`, drives **`TransferLoopPlayer`** (FPS / play), and **`SenderTransmissionView`** shows each wire frame (payload grid vs descriptor panel) with **corner markers** (`CornerMarkersView`).
-- **Receiver** — `ReceiverScreen` + `CaptureSessionController` deliver grayscale buffers for future vision hooks.
+- **Receiver** — `ReceiverScreen` + `CaptureSessionController`; throttled **`LumaGridDecoder`** (12×20, same thresholds as `python/grid_codec.py`) updates status with hex / ASCII preview (full-bleed, no homography yet).
 
 ## Integrating into an Xcode app
 

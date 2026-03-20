@@ -29,8 +29,9 @@ ctest --test-dir build-core --output-on-failure
 
 ```bash
 swift build
-swift test  # when tests exist
 ```
+
+`swift test` with XCTest is best run from **Xcode** (iOS Simulator destination) if you add a test target there; command-line SwiftPM may not resolve `XCTest` on all hosts.
 
 ### Python (optional)
 

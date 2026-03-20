@@ -1,0 +1,94 @@
+import CoreGraphics
+import Foundation
+
+/// Full-bleed 2-bit grid decode from an 8-bit luma buffer (same rules as `python/grid_codec.py`).
+public struct LumaGridDecoder: Sendable {
+    public init() {}
+
+    public func decode(
+        luma: Data,
+        width: Int,
+        height: Int,
+        gridRows: Int,
+        gridCols: Int,
+        marginPx: Int = 8,
+        gapPx: Int = 2,
+        maxOutputBytes: Int? = nil
+    ) -> Data? {
+        guard width > 0, height > 0, gridRows > 0, gridCols > 0 else { return nil }
+        let need = width * height
+        guard luma.count >= need else { return nil }
+
+        var symbols: [UInt8] = []
+        symbols.reserveCapacity(gridRows * gridCols)
+        for r in 0..<gridRows {
+            for c in 0..<gridCols {
+                let rect = Self.cellRect(
+                    viewportWidth: width,
+                    viewportHeight: height,
+                    rows: gridRows,
+                    cols: gridCols,
+                    margin: marginPx,
+                    gap: gapPx,
+                    row: r,
+                    col: c
+                )
+                let cx = Int((rect.minX + rect.maxX) * 0.5)
+                let cy = Int((rect.minY + rect.maxY) * 0.5)
+                let x = min(max(0, cx), width - 1)
+                let y = min(max(0, cy), height - 1)
+                let v = luma[y * width + x]
+                symbols.append(Self.lumaToSymbol(y: Float(v)))
+            }
+        }
+        return Self.symbolsToBytes(symbols, maxBytes: maxOutputBytes)
+    }
+
+    private static func cellRect(
+        viewportWidth: Int,
+        viewportHeight: Int,
+        rows: Int,
+        cols: Int,
+        margin: Int,
+        gap: Int,
+        row: Int,
+        col: Int
+    ) -> CGRect {
+        let innerW = CGFloat(viewportWidth - 2 * margin)
+        let innerH = CGFloat(viewportHeight - 2 * margin)
+        let cellW = (innerW - CGFloat(gap * (cols - 1))) / CGFloat(cols)
+        let cellH = (innerH - CGFloat(gap * (rows - 1))) / CGFloat(rows)
+        let x0 = CGFloat(margin) + CGFloat(col) * (cellW + CGFloat(gap))
+        let y0 = CGFloat(margin) + CGFloat(row) * (cellH + CGFloat(gap))
+        return CGRect(x: x0, y: y0, width: cellW, height: cellH)
+    }
+
+    private static func lumaToSymbol(y: Float) -> UInt8 {
+        if y < 63.75 { return 0 }
+        if y < 148.75 { return 1 }
+        if y < 233.75 { return 2 }
+        return 3
+    }
+
+    private static func symbolsToBytes(_ symbols: [UInt8], maxBytes: Int?) -> Data {
+        var bits: [UInt8] = []
+        bits.reserveCapacity(symbols.count * 2)
+        for s in symbols {
+            let v = s & 0x03
+            bits.append((v >> 1) & 1)
+            bits.append(v & 1)
+        }
+        var out = Data()
+        var i = 0
+        while i + 8 <= bits.count {
+            var b: UInt8 = 0
+            for j in 0..<8 {
+                b = (b << 1) | bits[i + j]
+            }
+            out.append(b)
+            i += 8
+            if let m = maxBytes, out.count >= m { break }
+        }
+        return out
+    }
+}

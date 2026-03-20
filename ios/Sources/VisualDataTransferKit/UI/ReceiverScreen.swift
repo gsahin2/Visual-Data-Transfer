@@ -1,5 +1,6 @@
 #if os(iOS)
 import AVFoundation
+import Foundation
 import SwiftUI
 import UIKit
 
@@ -26,12 +27,31 @@ public struct ReceiverScreen: View {
     }
 }
 
+/// Thread-safe frame counter for throttling decode work off the capture queue.
+private final class FrameTickCounter: @unchecked Sendable {
+    private var value = 0
+    private let lock = NSLock()
+    func next() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        value += 1
+        return value
+    }
+}
+
 @MainActor
 private final class ReceiverModel: ObservableObject, CaptureSessionControllerDelegate {
     @Published var status: String = "Camera idle"
     @Published var running: Bool = false
 
     let controller = CaptureSessionController()
+    private let frameTick = FrameTickCounter()
+    private let gridDecoder = LumaGridDecoder()
+
+    /// Matches sender default visual grid (`SenderScreen`).
+    private let gridRows = 12
+    private let gridCols = 20
+    private let decodeEveryNthFrame = 12
 
     init() {
         controller.delegate = self
@@ -60,8 +80,30 @@ private final class ReceiverModel: ObservableObject, CaptureSessionControllerDel
         width: Int,
         height: Int
     ) {
+        let tick = frameTick.next()
+        guard tick % decodeEveryNthFrame == 0 else { return }
+        let decoded = gridDecoder.decode(
+            luma: buffer,
+            width: width,
+            height: height,
+            gridRows: gridRows,
+            gridCols: gridCols,
+            marginPx: 8,
+            gapPx: 2,
+            maxOutputBytes: 64
+        )
         Task { @MainActor in
-            self.status = "Frame \(width)x\(height), \(buffer.count) bytes (vision decode hooks go here)"
+            var line = "Luma \(width)×\(height) · full-bleed grid \(self.gridRows)×\(self.gridCols)"
+            if let decoded, !decoded.isEmpty {
+                let hex = decoded.prefix(12).map { String(format: "%02x", $0) }.joined()
+                let head = Data(decoded.prefix(40))
+                let ascii = head.allSatisfy { (32...126).contains($0) || $0 == 9 || $0 == 10 || $0 == 13 }
+                let preview = ascii ? " · “\(String(decoding: head, as: UTF8.self))”" : ""
+                line += " · decoded \(decoded.count) B [\(hex)]\(preview)"
+            } else {
+                line += " · grid decode —"
+            }
+            self.status = line
         }
     }
 }

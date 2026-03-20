@@ -103,7 +103,8 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 |------|--------|
 | AVFoundation capture + preview | [x] — `CaptureSessionController`, `ReceiverScreen` |
 | Luma buffer callback to delegate | [x] |
-| Wire `GridSampler` / decode from luma in app | [ ] |
+| Full-bleed **2-bit grid** decode from luma (Swift, Python-parity) | [x] — `LumaGridDecoder` + `ReceiverScreen` status |
+| Wire C++ `GridSampler` / homography in app | [ ] |
 | Session state machine (detect transfer, progress, complete) | [ ] |
 | Progress UI, errors / retry hints | [~] — basic status text |
 | Duplicate / confidence / adaptive thresholding | [ ] |
@@ -141,6 +142,7 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 | Protocol / loop / CRC | `core/include/vdt/`, `core/src/` |
 | Tests | `core/tests/`, CMake + Catch2 |
 | Swift kit + demo | `ios/Sources/`, `ios/Demo/`, root `Package.swift` |
+| Swift luma grid decode | `ios/Sources/VisualDataTransferKit/Vision/LumaGridDecoder.swift` |
 | Python tools | `python/` |
 | Specs & constraints | `docs/` |
 
