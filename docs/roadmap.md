@@ -80,7 +80,8 @@ This roadmap tracks delivery of **reliable ~20 KB** transfers via **looping visu
 **Goal:** Ship as a feature + SDK.
 
 - Swift API: `encode(payload:)`, `SenderView`, `ReceiverController`, config (mode, speed, density).
-- Feature flag, Visual Transfer screen, share/export; copy and onboarding (“hold steady”); device matrix tests.
+
+**Progress (repo):** `VisualDataTransfer` + `VDTTransferConfiguration`; `SenderView` / `ReceiverController` / `ReceiverView`; `ProductTransferExperience` + `VDTProductFlags` (demo Settings toggle); onboarding + share/export; `VDTSessionTestLog` (device matrix fields); [`sdk-packaging.md`](sdk-packaging.md).
 
 **Deliverables:** Production-ready feature surface; documented SDK.
 

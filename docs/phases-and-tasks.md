@@ -132,11 +132,11 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 
 | Task | Status |
 |------|--------|
-| Clean public Swift API (`encode`, `SenderView`, `ReceiverController`, config) | [ ] |
-| Feature flag, dedicated product screen, share/export | [ ] |
-| Onboarding copy (“hold steady”), retry flows | [ ] |
-| Device matrix / lighting / distance test log | [ ] |
-| “Production-ready” SDK packaging (XCFramework / docs) | [ ] |
+| Clean public Swift API (`encode`, `SenderView`, `ReceiverController`, config) | [x] — `VisualDataTransfer.encodeLoopCycle`, `VDTTransferConfiguration`, `SenderView` (`SenderScreen` alias), `ReceiverController` + `ReceiverView` |
+| Feature flag, dedicated product screen, share/export | [x] — `VDTProductFlags.integratedExperienceEnabled` + demo **Settings** toggle; `ProductTransferExperience`; `ShareLink` on completed payload + JSON export from session log menu |
+| Onboarding copy (“hold steady”), retry flows | [x] — `VDTOnboardingCopy`; first-run banner in product shell; **Reset assembly** + reject copy in `ReceiverView` |
+| Device matrix / lighting / distance test log | [x] — `VDTSessionTestLog` / `VDTSessionTestEntry` (Application Support JSON); log sheet + export in product shell |
+| “Production-ready” SDK packaging (XCFramework / docs) | [x] — [`sdk-packaging.md`](sdk-packaging.md) (SPM primary, optional CMake static lib / XCFramework notes) |
 
 ---
 
@@ -146,7 +146,7 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 |------|-----------|
 | Protocol / loop / CRC | `core/include/vdt/`, `core/src/` |
 | Tests | `core/tests/`, CMake + Catch2 |
-| Swift kit + demo | `ios/Sources/`, `ios/Demo/`, root `Package.swift` |
+| Swift kit + demo | `ios/Sources/`, `ios/Demo/`, root `Package.swift`; public API under `API/`, `ProductTransferExperience`, [`docs/sdk-packaging.md`](sdk-packaging.md) |
 | Swift luma grid decode | `ios/Sources/VisualDataTransferKit/Vision/LumaGridDecoder.swift` |
 | Python tools | `python/` (`unittest`: `test_vdt_protocol_v1.py`) |
 | Specs & constraints | `docs/` |

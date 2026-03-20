@@ -1,6 +1,8 @@
 import SwiftUI
 
-public struct SenderScreen: View {
+public struct SenderView: View {
+    private let showTitle: Bool
+
     @State private var text: String = "Hello, VDT"
     @State private var sessionId: UInt32 = 1
     @State private var encodingMode: VDTEncodingMode = .normal
@@ -12,11 +14,15 @@ public struct SenderScreen: View {
 
     private let grid = VDTLayoutSpec(viewportWidth: 390, viewportHeight: 844, gridRows: 12, gridCols: 20)
 
-    public init() {}
+    public init(showTitle: Bool = true) {
+        self.showTitle = showTitle
+    }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Sender").font(.title2).bold()
+            if showTitle {
+                Text("Sender").font(.title2).bold()
+            }
             TextField("Payload", text: $text)
                 .textFieldStyle(.roundedBorder)
 #if os(iOS)
@@ -172,3 +178,6 @@ private enum LoopRepeatCap: String, CaseIterable, Identifiable {
         }
     }
 }
+
+/// Legacy name for ``SenderView`` (developer demos).
+public typealias SenderScreen = SenderView

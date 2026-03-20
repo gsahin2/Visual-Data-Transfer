@@ -48,6 +48,7 @@ The project is divided into three main layers:
 - AVFoundation camera capture
 - SwiftUI demo interface
 - C++ bridge layer
+- Public API (`VisualDataTransfer.encodeLoopCycle`, `ReceiverController`, `ProductTransferExperience`); see [`docs/sdk-packaging.md`](docs/sdk-packaging.md) and [`ios/README.md`](ios/README.md)
 
 ### 3. Python Tools
 - Offline video decoding
