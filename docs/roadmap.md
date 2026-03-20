@@ -2,6 +2,8 @@
 
 This roadmap tracks delivery of **reliable ~20 KB** transfers via **looping visual frames**, with the receiver recovering the full payload by observing long enough.
 
+**Task-level checklist (done / partial / todo):** [`phases-and-tasks.md`](phases-and-tasks.md)
+
 ## V1 goal
 
 - Transfer up to **20 KiB** using repeated visual frames.
@@ -52,7 +54,7 @@ This roadmap tracks delivery of **reliable ~20 KB** transfers via **looping visu
 
 **Deliverables:** Python or C++ recorded decoder achieving full payload reconstruction.
 
-**Progress (repo):** `python/vdt_protocol_v1.SessionAssembler` + `decode_recorded_video.py --wire-dir` to reassemble from raw `.bin` wire files (golden / simulator dumps). **`grid_decode_image.py`** decodes synthetic grid PNGs (same layout as `generate_test_frames.py`) back to bytes for optical round-trip checks. Video pixel path still **todo**.
+**Progress (repo):** `python/vdt_protocol_v1.SessionAssembler` + `decode_recorded_video.py --wire-dir` to reassemble from raw `.bin` wire files (golden / simulator dumps). **`grid_codec.py`** + **`grid_decode_image.py`** for PNGs; **`decode_recorded_video.py --decode-grid`** samples the same grid on each video frame (full-bleed, optional `--resize`). Homography / markers / wire extraction from video still **todo**.
 
 ## Phase 4 — Live camera receiver
 

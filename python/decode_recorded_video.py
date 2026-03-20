@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """
-Recorded video scaffold OR offline reassembly from raw wire `.bin` files.
-
-Vision decoding from pixels is Phase 3; `--wire-dir` exercises the session assembler today.
+Recorded video: optional **grid decode** on each frame, wire-dir reassembly, or legacy scaffold scan.
 """
 
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional, Tuple
 
 import numpy as np
 
@@ -21,6 +20,7 @@ except ImportError as exc:  # pragma: no cover - optional dependency path
 else:
     _cv_import_error = None
 
+from grid_codec import decode_grid_from_ndarray_bgr
 from vdt_protocol_v1 import SessionAssembler, parse_frame
 
 
@@ -71,19 +71,105 @@ def scan_video(path: Path, max_frames: int) -> None:
     print(f"Scanned {max_frames} frames, structured hits: {found}")
 
 
+def decode_video_grid(
+    path: Path,
+    max_frames: int,
+    stride: int,
+    rows: int,
+    cols: int,
+    margin: int,
+    gap: int,
+    byte_length: Optional[int],
+    resize_wh: Optional[Tuple[int, int]],
+) -> None:
+    if cv2 is None:
+        raise SystemExit(f"OpenCV is required: {_cv_import_error}")
+    cap = cv2.VideoCapture(str(path))
+    if not cap.isOpened():
+        raise SystemExit("Unable to open video")
+    decoded: List[bytes] = []
+    i = 0
+    processed = 0
+    while processed < max_frames:
+        ok, frame = cap.read()
+        if not ok:
+            break
+        if i % stride != 0:
+            i += 1
+            continue
+        if resize_wh is not None:
+            rw, rh = resize_wh
+            frame = cv2.resize(frame, (rw, rh), interpolation=cv2.INTER_AREA)
+        blob = decode_grid_from_ndarray_bgr(frame, rows, cols, margin, gap, byte_length)
+        decoded.append(blob)
+        preview = blob[:24]
+        print(f"frame {i}: decoded {len(blob)} B  head={preview!r}")
+        processed += 1
+        i += 1
+    cap.release()
+    if not decoded:
+        print("No frames decoded.")
+        return
+    ctr = Counter(decoded)
+    most_common = ctr.most_common(3)
+    print("---")
+    print(f"Unique decodes: {len(ctr)}  (top {len(most_common)} by count)")
+    for blob, count in most_common:
+        print(f"  x{count}: {blob[:48]!r}{'...' if len(blob) > 48 else ''}")
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="VDT video scaffold or wire-dir reassembly.")
+    parser = argparse.ArgumentParser(description="VDT: wire-dir, video grid decode, or legacy video scan.")
     parser.add_argument("video", nargs="?", type=Path, default=None, help="Input video path")
     parser.add_argument("--wire-dir", type=Path, default=None, help="Folder of wire frames (*.bin) to reassemble")
-    parser.add_argument("--max-frames", type=int, default=200, help="Video frames to scan")
+    parser.add_argument(
+        "--decode-grid",
+        action="store_true",
+        help="Decode 2-bit grid from each video frame (full-bleed, no homography)",
+    )
+    parser.add_argument("--max-frames", type=int, default=200, help="Max frames to process (grid or scan)")
+    parser.add_argument("--frame-stride", type=int, default=1, help="Use every Nth frame for --decode-grid")
+    parser.add_argument("--rows", type=int, default=12)
+    parser.add_argument("--cols", type=int, default=20)
+    parser.add_argument("--margin", type=int, default=8)
+    parser.add_argument("--gap", type=int, default=2)
+    parser.add_argument("--byte-length", type=int, default=None, help="Trim decoded bytes (payload length hint)")
+    parser.add_argument(
+        "--resize",
+        type=str,
+        default=None,
+        help="WxH resize before decode e.g. 640x480 (match generator resolution)",
+    )
     args = parser.parse_args()
+
+    resize_wh: Optional[Tuple[int, int]] = None
+    if args.resize:
+        try:
+            w_s, h_s = args.resize.lower().split("x", 1)
+            resize_wh = (int(w_s), int(h_s))
+        except ValueError as exc:
+            raise SystemExit("--resize must be like 640x480") from exc
 
     if args.wire_dir is not None:
         reassemble_wire_directory(args.wire_dir)
+    elif args.decode_grid:
+        if args.video is None:
+            parser.error("--decode-grid requires a video path")
+        decode_video_grid(
+            args.video,
+            args.max_frames,
+            args.frame_stride,
+            args.rows,
+            args.cols,
+            args.margin,
+            args.gap,
+            args.byte_length,
+            resize_wh,
+        )
     elif args.video is not None:
         scan_video(args.video, args.max_frames)
     else:
-        parser.error("Provide a video path or --wire-dir")
+        parser.error("Provide a video path, --wire-dir, or --decode-grid with video")
 
 
 if __name__ == "__main__":
