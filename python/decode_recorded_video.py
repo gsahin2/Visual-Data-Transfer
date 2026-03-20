@@ -103,6 +103,7 @@ def decode_video_grid(
     write_decoded: Optional[Path],
     try_parse_wire: bool,
     assemble_grid: bool,
+    write_assembled: Optional[Path],
     quiet: bool,
 ) -> None:
     if cv2 is None:
@@ -124,6 +125,18 @@ def decode_video_grid(
     asm_sessions_ok = 0
     asm_sessions_crc_fail = 0
     last_assembled_preview: Optional[bytes] = None
+    assembled_seq = 0
+    last_grid_frame_index = -1
+
+    def save_assembled_payload(merged: bytes, frame_idx: int) -> None:
+        nonlocal assembled_seq
+        if write_assembled is None:
+            return
+        write_assembled.mkdir(parents=True, exist_ok=True)
+        assembled_seq += 1
+        outp = write_assembled / f"assembled_{assembled_seq:04d}_frame_{frame_idx:06d}.bin"
+        outp.write_bytes(merged)
+
     while processed < max_frames:
         ok, frame = cap.read()
         if not ok:
@@ -163,6 +176,7 @@ def decode_video_grid(
                 if merged is not None:
                     asm_sessions_ok += 1
                     last_assembled_preview = merged[:120]
+                    save_assembled_payload(merged, i)
                     if not quiet:
                         print(
                             f"frame {i}: ASSEMBLED {len(merged)} B  "
@@ -178,6 +192,7 @@ def decode_video_grid(
             write_decoded.mkdir(parents=True, exist_ok=True)
             outp = write_decoded / f"frame_{i:06d}.bin"
             outp.write_bytes(blob)
+        last_grid_frame_index = i
         processed += 1
         i += 1
     cap.release()
@@ -201,6 +216,7 @@ def decode_video_grid(
                 asm_sessions_ok += 1
                 last_assembled_preview = pl[:120]
                 eof_drained_ok = True
+                save_assembled_payload(pl, max(0, last_grid_frame_index))
                 print(
                     f"assembly: session finished at EOF → {len(pl)} B  "
                     f"{pl[:100]!r}{'...' if len(pl) > 100 else ''}"
@@ -219,6 +235,8 @@ def decode_video_grid(
             print("assembly: no valid wire frames were pushed (grid blobs are not full VT wire?)")
         elif not asm.is_complete() and not eof_drained_ok:
             print("assembly: incomplete at EOF (partial session; need more frames or full-wire grid)")
+        if write_assembled is not None and assembled_seq > 0:
+            print(f"assembly: wrote {assembled_seq} payload file(s) → {write_assembled}")
     if not decoded:
         print("No grid decodes accumulated.")
         return
@@ -268,6 +286,12 @@ def main() -> None:
         help="With --decode-grid: feed parseable wire frames into SessionAssembler (video → payload when grid carries full wire)",
     )
     parser.add_argument(
+        "--write-assembled",
+        type=Path,
+        default=None,
+        help="With --assemble-grid: write each merged payload to this directory (assembled_NNNN_frame_FFFFFF.bin)",
+    )
+    parser.add_argument(
         "--quiet",
         action="store_true",
         help="With --decode-grid: no per-frame lines; still print summary stats",
@@ -287,6 +311,8 @@ def main() -> None:
     elif args.decode_grid:
         if args.video is None:
             parser.error("--decode-grid requires a video path")
+        if args.write_assembled is not None and not args.assemble_grid:
+            parser.error("--write-assembled requires --assemble-grid")
         decode_video_grid(
             args.video,
             args.max_frames,
@@ -300,6 +326,7 @@ def main() -> None:
             args.write_decoded,
             args.try_parse_wire,
             args.assemble_grid,
+            args.write_assembled,
             args.quiet,
         )
     elif args.video is not None:

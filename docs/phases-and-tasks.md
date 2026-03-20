@@ -89,6 +89,7 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 | From **video frames**: classify → **wire** `parse_frame` / chunk assembly | [~] — `--assemble-grid` streams valid `parse_frame` hits into `SessionAssembler` (needs **full** VT wire in grid decode; typical sender payload grid is too short per frame) |
 | Timestamp / frame-skip policy for video | [~] — `--frame-stride` |
 | Dump grid-decoded blobs to disk | [x] — `--write-decoded DIR` |
+| Dump **merged** payloads from grid assembly | [x] — `--write-assembled DIR` (with `--assemble-grid`) |
 | Optional `parse_frame` on grid output (debug) | [x] — `--try-parse-wire` |
 | Debug overlays, missing-frame stats, logging | [~] — `--decode-grid` prints **read vs decoded** counts, stride skips, stop reason (`eof` / `max_frames`); with `--try-parse-wire`: magic prefix / short / parse_ok / parse_fail; **`--quiet`** skips per-frame lines; **`--wire-dir`** summary: push_ok / push_fail |
 | End-to-end: **video file → full payload** (optical) | [ ] |
