@@ -35,10 +35,18 @@ def reassemble_wire_directory(directory: Path) -> None:
     files = sorted(directory.glob("*.bin"))
     if not files:
         raise SystemExit(f"No .bin files in {directory}")
+    ok_n = 0
+    fail_n = 0
     for path in files:
         wire = path.read_bytes()
         ok = asm.push_wire(wire)
+        if ok:
+            ok_n += 1
+        else:
+            fail_n += 1
         print(f"{path.name}: push {'ok' if ok else 'FAIL'}")
+    print("---")
+    print(f"wire-dir: {len(files)} files  push_ok={ok_n}  push_fail={fail_n}")
     if asm.is_complete():
         payload = asm.take_payload()
         if payload is None:
@@ -94,6 +102,7 @@ def decode_video_grid(
     resize_wh: Optional[Tuple[int, int]],
     write_decoded: Optional[Path],
     try_parse_wire: bool,
+    quiet: bool,
 ) -> None:
     if cv2 is None:
         raise SystemExit(f"OpenCV is required: {_cv_import_error}")
@@ -103,10 +112,16 @@ def decode_video_grid(
     decoded: List[bytes] = []
     i = 0
     processed = 0
+    frames_read = 0
+    parse_short = 0
+    parse_ok = 0
+    parse_fail = 0
+    magic_prefix = 0
     while processed < max_frames:
         ok, frame = cap.read()
         if not ok:
             break
+        frames_read += 1
         if i % stride != 0:
             i += 1
             continue
@@ -117,11 +132,20 @@ def decode_video_grid(
         decoded.append(blob)
         preview = blob[:24]
         extra = ""
-        if try_parse_wire and len(blob) >= 20:
-            hit = parse_frame(blob)
-            if hit:
-                extra = f"  {_wire_line(hit)}"
-        print(f"frame {i}: decoded {len(blob)} B  head={preview!r}{extra}")
+        if try_parse_wire:
+            if len(blob) < 20:
+                parse_short += 1
+            else:
+                if len(blob) >= 2 and blob[0] == 0x56 and blob[1] == 0x54:
+                    magic_prefix += 1
+                hit = parse_frame(blob)
+                if hit:
+                    parse_ok += 1
+                    extra = f"  {_wire_line(hit)}"
+                else:
+                    parse_fail += 1
+        if not quiet:
+            print(f"frame {i}: decoded {len(blob)} B  head={preview!r}{extra}")
         if write_decoded is not None:
             write_decoded.mkdir(parents=True, exist_ok=True)
             outp = write_decoded / f"frame_{i:06d}.bin"
@@ -129,12 +153,23 @@ def decode_video_grid(
         processed += 1
         i += 1
     cap.release()
+    skipped_stride = max(0, frames_read - processed)
+    stop_reason = "max_frames" if processed >= max_frames else "eof"
+    print("---")
+    print(
+        f"read: {frames_read} video frames  decoded: {processed}  "
+        f"stride={stride} (not decoded due to stride: {skipped_stride})  stop={stop_reason}"
+    )
+    if try_parse_wire:
+        print(
+            f"wire parse: magic_0x5654_prefix={magic_prefix}  "
+            f"too_short_lt20={parse_short}  parse_ok={parse_ok}  parse_fail={parse_fail}"
+        )
     if not decoded:
-        print("No frames decoded.")
+        print("No grid decodes accumulated.")
         return
     ctr = Counter(decoded)
     most_common = ctr.most_common(3)
-    print("---")
     print(f"Unique decodes: {len(ctr)}  (top {len(most_common)} by count)")
     for blob, count in most_common:
         print(f"  x{count}: {blob[:48]!r}{'...' if len(blob) > 48 else ''}")
@@ -173,6 +208,11 @@ def main() -> None:
         action="store_true",
         help="After grid decode, try v1 parse_frame(blob) (e.g. if screen showed raw wire)",
     )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="With --decode-grid: no per-frame lines; still print summary stats",
+    )
     args = parser.parse_args()
 
     resize_wh: Optional[Tuple[int, int]] = None
@@ -200,6 +240,7 @@ def main() -> None:
             resize_wh,
             args.write_decoded,
             args.try_parse_wire,
+            args.quiet,
         )
     elif args.video is not None:
         scan_video(args.video, args.max_frames)
