@@ -109,8 +109,8 @@ This is the working checklist for **Visual Data Transfer V1** (20 KiB target). I
 | If luma decodes to raw **VT** wire, show parse in status | [x] — magic `0x56 0x54` + `VDTWireFrameParser` |
 | **`VDTSessionReassembler`** (core assembler via C API) | [x] — when a **full** wire frame parses; normal sender grid is **payload-only** (~60 B/cell budget), so E2E optical assembly needs larger grid or full-wire mode later |
 | Wire C++ `GridSampler` / homography in app | [ ] |
-| Session state machine (detect transfer, progress, complete) | [ ] |
-| Progress UI, errors / retry hints | [~] — basic status text |
+| Session state machine (detect transfer, progress, complete) | [~] — `ReceiverScreen` **RX:** line: listening → ingesting chunk / reject → complete; sticky last payload until new descriptor or stop |
+| Progress UI, errors / retry hints | [~] — luma line + auxiliary status (assembly hints) |
 | Duplicate / confidence / adaptive thresholding | [ ] |
 
 ---

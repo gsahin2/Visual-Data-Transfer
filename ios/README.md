@@ -4,7 +4,7 @@
 
 - **C bridge** — wraps `vdt_*` functions from `VDTCoreC` (built from `core/` sources).
 - **Sender** — `SenderScreen` builds a loop cycle via `VDTFramedSession`, drives **`TransferLoopPlayer`** (FPS / play/step / **completed loop count** / optional **auto-stop** after N loops; **CADisplayLink** on iOS, `Timer` on macOS for SwiftPM), and **`SenderTransmissionView`** shows each wire frame (payload grid vs descriptor panel) with **`MatrixRainGutterOverlay`** (Matrix glyphs only in gutters, decode-safe) and **corner markers** (`CornerMarkersView`).
-- **Receiver** — `ReceiverScreen` + `CaptureSessionController`; throttled **`LumaGridDecoder`** (12×20, same thresholds as `python/grid_codec.py`) updates status with hex / ASCII preview; if bytes form a **full** VT wire frame, **`VDTWireFrameParser`** + **`VDTSessionReassembler`** (C `SessionAssembler`) can merge chunks when the session completes (full-bleed, no homography yet; default sender grid carries **frame payload** only, not whole wire).
+- **Receiver** — `ReceiverScreen` + `CaptureSessionController`; throttled **`LumaGridDecoder`** (12×20, same thresholds as `python/grid_codec.py`) updates status with hex / ASCII preview; optional **RX:** auxiliary line (listening / ingesting / reject / complete + sticky last payload); if bytes form a **full** VT wire frame, **`VDTWireFrameParser`** + **`VDTSessionReassembler`** can merge chunks when the session completes (full-bleed, no homography yet; default sender grid carries **frame payload** only, not whole wire).
 
 ## Integrating into an Xcode app
 
